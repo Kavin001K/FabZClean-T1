@@ -1416,28 +1416,203 @@ export class SupabaseStorage {
     // ======= WALLET & MASTER LEDGER RPC CALLS =======
     // These methods call Postgres Stored Procedures to guarantee ACID transactions.
 
+    private mapWalletTransactionRow(row: any, employeeNameById?: Map<string, string>) {
+        const rawAmount = Number(row.amount ?? 0);
+        const transactionType = String(row.transaction_type || row.type || '').toUpperCase();
+        const isDebit = transactionType === 'DEBIT' || rawAmount < 0;
+        const signedAmount = isDebit ? -Math.abs(rawAmount) : Math.abs(rawAmount);
+        const createdBy = row.created_by || row.verified_by_staff || null;
+
+        return {
+            id: row.id,
+            transactionId: row.transaction_id,
+            entryNo: row.entry_no ?? null,
+            customerId: row.customer_id,
+            transactionType: isDebit ? 'DEBIT' : 'CREDIT',
+            type: isDebit ? 'debit' : 'credit',
+            amount: signedAmount,
+            balanceBefore: Number(row.balance_before ?? 0),
+            balanceAfter: Number(row.balance_after ?? 0),
+            paymentMethod: row.payment_method || null,
+            referenceType: row.reference_type || null,
+            referenceId: row.reference_id || row.reference_order_id || null,
+            orderId: row.reference_order_id || (row.reference_type === 'ORDER' ? row.reference_id : null),
+            note: row.note || row.notes || '',
+            description: row.note || row.notes || '',
+            createdAt: row.created_at,
+            transactionDate: row.created_at,
+            recordedBy: createdBy,
+            recordedByName: createdBy && employeeNameById?.get(createdBy) || row.recorded_by_name || null,
+        };
+    }
+
+    async getWalletHistory(customerId: string, limit = 50): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            console.error('[SupabaseStorage] getWalletHistory error:', error);
+            throw error;
+        }
+
+        const rows = data || [];
+        const staffIds = [...new Set(
+            rows
+                .map((row: any) => row.created_by || row.verified_by_staff)
+                .filter(Boolean)
+        )];
+
+        const employeeNameById = new Map<string, string>();
+        if (staffIds.length > 0) {
+            const { data: employees } = await this.supabase
+                .from('employees')
+                .select('id, username, full_name')
+                .in('id', staffIds);
+
+            for (const emp of employees || []) {
+                employeeNameById.set(emp.id, emp.full_name || emp.username || 'Staff');
+            }
+        }
+
+        return rows.map((row: any) => this.mapWalletTransactionRow(row, employeeNameById));
+    }
+
+    private async fetchLatestWalletTransaction(customerId: string) {
+        const { data, error } = await this.supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return this.mapWalletTransactionRow(data);
+    }
+
     async processWalletRecharge(
         customerId: string,
         amount: number,
         paymentMethod: string,
         recordedBy: string,
-        recordedByName: string
-    ): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+        recordedByName: string,
+        options?: {
+            referenceNumber?: string;
+            notes?: string;
+        }
+    ): Promise<{
+        success: boolean;
+        newBalance?: number;
+        balanceBefore?: number;
+        transactionId?: string;
+        id?: string;
+        entryNo?: string | number | null;
+        paymentMethod?: string;
+        amount?: number;
+        error?: string;
+    }> {
         try {
             const safeRecordedBy = this.toUuidOrNull(recordedBy);
-            const { data, error } = await this.supabase.rpc('process_wallet_recharge', {
+            const { data, error } = await this.supabase.rpc('process_wallet_recharge_v2', {
                 p_customer_id: customerId,
                 p_amount: amount,
                 p_payment_method: paymentMethod,
                 p_recorded_by: safeRecordedBy,
-                p_recorded_by_name: recordedByName
+                p_recorded_by_name: recordedByName,
+                p_reference_id: options?.referenceNumber || null,
+                p_note: options?.notes || null,
             });
 
-            if (error) throw error;
-            return { success: true, newBalance: data };
+            if (!error && data) {
+                const payload = typeof data === 'object' ? data : {};
+                return {
+                    success: true,
+                    newBalance: Number(payload.balance_after ?? 0),
+                    balanceBefore: Number(payload.balance_before ?? 0),
+                    transactionId: payload.transaction_id,
+                    id: payload.id,
+                    entryNo: payload.entry_no ?? null,
+                    paymentMethod: payload.payment_method || paymentMethod,
+                    amount: Number(payload.amount ?? amount),
+                };
+            }
+
+            if (error && !/process_wallet_recharge_v2/i.test(error.message || '')) {
+                throw error;
+            }
+
+            const { data: legacyBalance, error: legacyError } = await this.supabase.rpc('process_wallet_recharge', {
+                p_customer_id: customerId,
+                p_amount: amount,
+                p_payment_method: paymentMethod,
+                p_recorded_by: safeRecordedBy,
+                p_recorded_by_name: recordedByName,
+            });
+
+            if (legacyError) throw legacyError;
+
+            const latest = await this.fetchLatestWalletTransaction(customerId);
+            return {
+                success: true,
+                newBalance: Number(legacyBalance ?? latest?.balanceAfter ?? 0),
+                balanceBefore: latest?.balanceBefore,
+                transactionId: latest?.transactionId,
+                id: latest?.id,
+                entryNo: latest?.entryNo ?? null,
+                paymentMethod: latest?.paymentMethod || paymentMethod,
+                amount,
+            };
         } catch (err: any) {
             console.error('[SupabaseStorage] Recharging Wallet failed:', err);
             return { success: false, error: err.message || 'Failed to recharge wallet due to a database exception.' };
+        }
+    }
+
+    async processWalletDebit(
+        customerId: string,
+        amount: number,
+        recordedBy: string,
+        recordedByName: string,
+        note?: string
+    ): Promise<{
+        success: boolean;
+        newBalance?: number;
+        balanceBefore?: number;
+        transactionId?: string;
+        id?: string;
+        entryNo?: string | number | null;
+        amount?: number;
+        error?: string;
+    }> {
+        try {
+            const safeRecordedBy = this.toUuidOrNull(recordedBy);
+            const { data, error } = await this.supabase.rpc('process_wallet_debit', {
+                p_customer_id: customerId,
+                p_amount: amount,
+                p_note: note || null,
+                p_recorded_by: safeRecordedBy,
+                p_recorded_by_name: recordedByName,
+            });
+
+            if (error) throw error;
+
+            const payload = typeof data === 'object' ? data : {};
+            return {
+                success: true,
+                newBalance: Number(payload.balance_after ?? 0),
+                balanceBefore: Number(payload.balance_before ?? 0),
+                transactionId: payload.transaction_id,
+                id: payload.id,
+                entryNo: payload.entry_no ?? null,
+                amount: Number(payload.amount ?? amount),
+            };
+        } catch (err: any) {
+            console.error('[SupabaseStorage] Wallet debit failed:', err);
+            return { success: false, error: err.message || 'Failed to debit wallet.' };
         }
     }
 

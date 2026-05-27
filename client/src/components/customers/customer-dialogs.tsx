@@ -757,6 +757,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
           onClose={() => setIsRechargeModalOpen(false)}
           customerId={selectedCustomer.id}
           customerName={selectedCustomer.name}
+          customerPhone={selectedCustomer.phone}
           onRechargeSuccess={() => {
             // Trigger partial refresh or just let websockets handle it
             setIsRechargeModalOpen(false);

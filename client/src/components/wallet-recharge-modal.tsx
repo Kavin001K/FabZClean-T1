@@ -1,33 +1,79 @@
 import React, { useState } from 'react';
-import { apiRequest } from "@/lib/queryClient";
+import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Wallet, Smartphone, CreditCard, Banknote, RefreshCw, CheckCircle, Receipt } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { Wallet, RefreshCw, CheckCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
+import {
+  invalidateWalletQueries,
+  rechargeWallet,
+  WALLET_PAYMENT_METHODS,
+  type WalletRechargeResult,
+} from "@/lib/wallet-service";
+import { printWalletTopUpReceipt } from "@/lib/wallet-receipt";
+import { cn } from "@/lib/utils";
 
 interface WalletRechargeModalProps {
     customerId: string;
     customerName: string;
+    customerPhone?: string | null;
     isOpen: boolean;
     onClose: () => void;
     onRechargeSuccess?: (newBalance: number) => void;
 }
 
-const paymentMethods = [
-    { id: 'CASH', name: 'Cash', icon: <Banknote className="w-5 h-5" /> },
-    { id: 'UPI', name: 'UPI', icon: <Smartphone className="w-5 h-5" /> },
-    { id: 'CARD', name: 'Card', icon: <CreditCard className="w-5 h-5" /> },
-    { id: 'BANK_TRANSFER', name: 'Bank Transfer', icon: <Receipt className="w-5 h-5" /> }
-];
+const RECHARGE_QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 
-export function WalletRechargeModal({ customerId, customerName, isOpen, onClose, onRechargeSuccess }: WalletRechargeModalProps) {
+export function WalletRechargeModal({
+    customerId,
+    customerName,
+    customerPhone,
+    isOpen,
+    onClose,
+    onRechargeSuccess,
+}: WalletRechargeModalProps) {
     const { toast } = useToast();
+    const { employee } = useAuth();
+    const queryClient = useQueryClient();
     const [amount, setAmount] = useState('');
     const [selectedMethod, setSelectedMethod] = useState('CASH');
+    const [referenceNumber, setReferenceNumber] = useState('');
+    const [notes, setNotes] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+
+    const showReceiptToast = (result: WalletRechargeResult, parsedAmount: number) => {
+        const newBalance = Number(result.newBalance ?? 0);
+        toast({
+            title: "Wallet recharged",
+            description: `Added ${formatCurrency(parsedAmount)} to ${customerName}'s wallet.`,
+            action: (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                        printWalletTopUpReceipt({
+                            customer: { name: customerName, phone: customerPhone },
+                            amount: parsedAmount,
+                            paymentMethod: result.paymentMethod || selectedMethod,
+                            referenceNumber: referenceNumber || undefined,
+                            notes: notes || undefined,
+                            balanceBefore: result.balanceBefore,
+                            balanceAfter: newBalance,
+                            transactionId: result.transactionId || result.id,
+                            entryNo: result.entryNo,
+                            staffName: employee?.fullName || employee?.username,
+                        });
+                    }}
+                >
+                    Print receipt
+                </Button>
+            ),
+        });
+    };
 
     const handleRecharge = async () => {
         const parsedAmount = parseFloat(amount);
@@ -40,39 +86,47 @@ export function WalletRechargeModal({ customerId, customerName, isOpen, onClose,
             return;
         }
 
+        if (!notes.trim()) {
+            toast({
+                title: "Note required",
+                description: "Add an internal note for this recharge.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         setIsProcessing(true);
         try {
-            const res = await apiRequest("POST", `/api/wallet/recharge`, {
+            const result = await rechargeWallet({
                 customerId,
                 amount: parsedAmount,
-                paymentMethod: selectedMethod
+                paymentMethod: selectedMethod,
+                referenceNumber: referenceNumber.trim() || undefined,
+                notes: notes.trim(),
             });
 
-            const responseData = await res.json();
+            invalidateWalletQueries(queryClient, customerId);
+            showReceiptToast(result, parsedAmount);
 
-            toast({
-                title: "Recharge Successful",
-                description: `Successfully added ${formatCurrency(parsedAmount)} to ${customerName}'s wallet.`,
-            });
-
-            if (onRechargeSuccess && responseData.data?.newBalance !== undefined) {
-                onRechargeSuccess(responseData.data.newBalance);
+            if (onRechargeSuccess && result.newBalance !== undefined) {
+                onRechargeSuccess(Number(result.newBalance));
             }
 
             setAmount('');
+            setReferenceNumber('');
+            setNotes('');
             onClose();
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Failed to process wallet recharge.";
             toast({
                 title: "Recharge Failed",
-                description: error.message || "Failed to process wallet recharge.",
+                description: message,
                 variant: "destructive",
             });
         } finally {
             setIsProcessing(false);
         }
     };
-
-    const quickAmounts = [500, 1000, 2000, 5000];
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -85,7 +139,7 @@ export function WalletRechargeModal({ customerId, customerName, isOpen, onClose,
                 </DialogHeader>
 
                 <div className="space-y-6 mt-4">
-                    <div className="bg-slate-50 p-3 rounded-lg border">
+                    <div className="bg-slate-50 p-3 rounded-lg border dark:bg-slate-900">
                         <span className="text-sm text-muted-foreground">Customer: </span>
                         <span className="font-semibold">{customerName}</span>
                     </div>
@@ -105,7 +159,7 @@ export function WalletRechargeModal({ customerId, customerName, isOpen, onClose,
                         </div>
 
                         <div className="flex gap-2 flex-wrap pt-1">
-                            {quickAmounts.map((qAmount) => (
+                            {RECHARGE_QUICK_AMOUNTS.map((qAmount) => (
                                 <Button
                                     key={qAmount}
                                     variant="outline"
@@ -122,25 +176,42 @@ export function WalletRechargeModal({ customerId, customerName, isOpen, onClose,
                     <div className="space-y-3">
                         <Label>Payment Method</Label>
                         <div className="grid grid-cols-2 gap-2">
-                            {paymentMethods.map((method) => (
+                            {WALLET_PAYMENT_METHODS.map((method) => (
                                 <Button
                                     key={method.id}
                                     variant={selectedMethod === method.id ? 'default' : 'outline'}
                                     onClick={() => setSelectedMethod(method.id)}
-                                    className="justify-start"
+                                    className={cn("justify-start")}
                                 >
-                                    {method.icon}
-                                    <span className="ml-2">{method.name}</span>
+                                    <span>{method.name}</span>
                                 </Button>
                             ))}
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Reference (optional)</Label>
+                        <Input
+                            placeholder="Transaction ID / receipt #"
+                            value={referenceNumber}
+                            onChange={(e) => setReferenceNumber(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Internal note (required)</Label>
+                        <Input
+                            placeholder="Additional context..."
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                        />
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t">
                         <Button variant="outline" onClick={onClose} disabled={isProcessing}>Cancel</Button>
                         <Button
                             onClick={handleRecharge}
-                            disabled={isProcessing || !amount || parseFloat(amount) <= 0}
+                            disabled={isProcessing || !amount || parseFloat(amount) <= 0 || !notes.trim()}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[140px]"
                         >
                             {isProcessing ? (

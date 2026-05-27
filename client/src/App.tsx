@@ -154,6 +154,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      {/* Legacy URL: /credits redirects to wallet management (prepaid + credit ledger) */}
       <Route path="/credits">
         <ProtectedRoute>
           <MainLayout>

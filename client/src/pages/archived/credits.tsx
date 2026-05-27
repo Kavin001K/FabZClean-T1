@@ -1,4 +1,7 @@
 /**
+ * @deprecated Archived — use /wallet-management (WalletManagement) instead.
+ * Kept for reference only; not routed in App.tsx.
+ *
  * Credit Management Page
  * 
  * Features:

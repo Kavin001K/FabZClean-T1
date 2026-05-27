@@ -283,20 +283,42 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
             if (newBalance < 0) {
                 return res.status(400).json(createErrorResponse('Wallet balance cannot be negative', 400));
             }
-            
-            const rechargeResult = await (storage as any).processWalletRecharge(
-                customerId,
-                changeAmount,
-                'WALLET_ADJUSTMENT',
-                req.employee?.id || null,
-                req.employee?.username || 'system'
-            );
 
-            if (!rechargeResult.success) {
-                return res.status(400).json(createErrorResponse(rechargeResult.error || 'Failed to adjust wallet balance', 400));
+            const adjustmentNote = `Manual Adjustment: ${reason}${notes ? ` - ${notes}` : ''}`;
+            const recordedBy = req.employee?.id || null;
+            const recordedByName = req.employee?.username || 'system';
+
+            if (changeAmount < 0) {
+                const debitResult = await (storage as any).processWalletDebit(
+                    customerId,
+                    Math.abs(changeAmount),
+                    recordedBy,
+                    recordedByName,
+                    adjustmentNote
+                );
+
+                if (!debitResult.success) {
+                    return res.status(400).json(createErrorResponse(debitResult.error || 'Failed to adjust wallet balance', 400));
+                }
+
+                result = { type: 'wallet_adjustment', newBalance: debitResult.newBalance };
+            } else {
+                const rechargeResult = await (storage as any).processWalletRecharge(
+                    customerId,
+                    changeAmount,
+                    'WALLET_ADJUSTMENT',
+                    recordedBy,
+                    recordedByName,
+                    { notes: adjustmentNote }
+                );
+
+                if (!rechargeResult.success) {
+                    return res.status(400).json(createErrorResponse(rechargeResult.error || 'Failed to adjust wallet balance', 400));
+                }
+
+                result = { type: 'wallet_adjustment', newBalance: rechargeResult.newBalance };
             }
 
-            result = { type: 'wallet_adjustment', newBalance: rechargeResult.newBalance };
             finalMessage = 'Wallet balance adjusted successfully';
         } else {
             // Standard outstanding balance adjustment

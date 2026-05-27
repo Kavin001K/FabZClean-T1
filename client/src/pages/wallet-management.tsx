@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins, Users, Banknote, Smartphone, CreditCard, Building, FileText, Printer } from "lucide-react";
 import { PageTransition } from "@/components/ui/page-transition";
@@ -43,6 +43,22 @@ import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { readWalletCustomersCache, writeWalletCustomersCache } from "@/lib/wallet-cache";
+import { getLedgerDirection } from "@/lib/wallet-ledger";
+import {
+  adjustBalance,
+  canManageWallet,
+  fetchCustomerOrders,
+  fetchRefundedAmount,
+  fetchWalletHistory,
+  invalidateWalletQueries,
+  payCredit,
+  rechargeWallet,
+  refundWallet,
+  WALLET_PAYMENT_METHODS,
+  WALLET_QUERY_KEYS,
+  type WalletRechargeResult,
+} from "@/lib/wallet-service";
+import { printWalletLedgerReceipt, printWalletTopUpReceipt } from "@/lib/wallet-receipt";
 
 type FilterType = "all" | "clear" | "outstanding" | "prepaid" | "exceeded";
 
@@ -55,6 +71,13 @@ interface WalletCustomer {
   creditLimit?: number | string;
   walletBalanceCache?: number | string;
 }
+
+type WalletCustomerOrder = {
+  id: string;
+  orderNumber?: string;
+  totalAmount?: string | number;
+  createdAt?: string;
+};
 
 const toNumber = (value: unknown, fallback = 0) => {
   const num = typeof value === "number" ? value : Number(value);
@@ -86,53 +109,16 @@ const fetchCustomers = async (): Promise<WalletCustomer[]> => {
   return allCustomers;
 };
 
-const walletApi = {
-  recharge: async (customerId: string, payload: { amount: number; paymentMethod: string; referenceNumber?: string; notes?: string }) => {
-    const res = await authorizedFetch(`/wallet/recharge`, {
-      method: "POST",
-      body: JSON.stringify({
-        customerId,
-        amount: payload.amount,
-        paymentMethod: payload.paymentMethod,
-        referenceNumber: payload.referenceNumber,
-        notes: payload.notes,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.message || "Failed to recharge wallet");
-    return data;
-  },
-  refund: async (customerId: string, payload: { amount: number; refundMethod: string; reason: string; notes?: string }) => {
-    const res = await authorizedFetch(`/wallet/refund`, {
-      method: "POST",
-      body: JSON.stringify({
-        customerId,
-        ...payload
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.message || "Failed to issue refund");
-    return data;
-  },
-  payCredit: async (customerId: string, payload: { amount: number; paymentMethod: string; referenceNumber?: string; notes?: string }) => {
-    const res = await authorizedFetch(`/credits/${customerId}/payment`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.message || "Failed to record credit payment");
-    return data;
-  },
-  adjust: async (customerId: string, payload: { amount: number; target: string; reason: string; notes?: string }) => {
-    const res = await authorizedFetch(`/credits/${customerId}/adjust`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.message || "Failed to adjust wallet");
-    return data;
-  },
+const PAYMENT_METHOD_ICONS: Record<string, React.ReactNode> = {
+  CASH: <Banknote className="w-4 h-4" />,
+  UPI: <Smartphone className="w-4 h-4" />,
+  CARD: <CreditCard className="w-4 h-4" />,
+  NET_BANKING: <Building className="w-4 h-4" />,
+  CHEQUE: <FileText className="w-4 h-4" />,
+  OTHER: <Search className="w-4 h-4" />,
 };
+
+const RECHARGE_QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 
 export default function WalletManagementPage() {
   useEffect(() => {
@@ -153,7 +139,7 @@ export default function WalletManagementPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [referenceNumber, setReferenceNumber] = useState("");
 
   const [reason, setReason] = useState("");
@@ -161,11 +147,11 @@ export default function WalletManagementPage() {
   const [adjustTarget, setAdjustTarget] = useState("outstanding");
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
 
-  const canAdjust = employee?.role === "admin";
+  const canManageWalletActions = canManageWallet(employee?.role);
   const cachedCustomers = useMemo(() => readWalletCustomersCache<WalletCustomer>(), []);
 
   const { data: customers = [], isLoading, refetch } = useQuery({
-    queryKey: ["wallet-management", "customers"],
+    queryKey: WALLET_QUERY_KEYS.customers,
     queryFn: fetchCustomers,
     staleTime: 15000,
     initialData: cachedCustomers?.customers,
@@ -173,44 +159,26 @@ export default function WalletManagementPage() {
   });
 
   const { data: customerHistory = [], isLoading: historyLoading } = useQuery({
-    queryKey: ["customer-credits", selectedCustomer?.id],
-    queryFn: async () => {
-      if (!selectedCustomer) return [];
-      const res = await authorizedFetch(`/credits/${selectedCustomer.id}`);
-      if (!res.ok) throw new Error("Failed to load history");
-      const payload = await res.json();
-      return Array.isArray(payload.data?.history) ? payload.data.history : [];
-    },
+    queryKey: selectedCustomer ? WALLET_QUERY_KEYS.history(selectedCustomer.id) : ['wallet', 'history', 'none'],
+    queryFn: () => fetchWalletHistory(selectedCustomer!.id),
     enabled: !!selectedCustomer && historyOpen,
   });
 
   const { data: customerOrders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["customer-orders", selectedCustomer?.id],
-    queryFn: async () => {
-      if (!selectedCustomer) return [];
-      const res = await authorizedFetch(`/orders/customer/${selectedCustomer.id}`);
-      if (!res.ok) throw new Error("Failed to load customer orders");
-      const payload = await res.json();
-      return Array.isArray(payload.data) ? payload.data : [];
-    },
+    queryFn: () => fetchCustomerOrders(selectedCustomer!.id),
     enabled: !!selectedCustomer && refundOpen,
   });
 
   const { data: refundedAmountData } = useQuery({
     queryKey: ["refunded-amount", selectedOrderId],
-    queryFn: async () => {
-      if (!selectedOrderId) return 0;
-      const res = await authorizedFetch(`/wallet/refunds/${selectedOrderId}`);
-      if (!res.ok) return 0;
-      const payload = await res.json();
-      return payload.data?.totalRefunded || 0;
-    },
+    queryFn: () => fetchRefundedAmount(selectedOrderId),
     enabled: !!selectedOrderId && refundOpen,
   });
 
   const refundedAmount = refundedAmountData || 0;
-  const selectedOrder = customerOrders.find((o: any) => o.id === selectedOrderId);
-  const maxRefund = selectedOrder ? Math.max(0, parseFloat(selectedOrder.totalAmount || "0") - refundedAmount) : 0;
+  const selectedOrder = (customerOrders as WalletCustomerOrder[]).find((o) => o.id === selectedOrderId);
+  const maxRefund = selectedOrder ? Math.max(0, toNumber(selectedOrder.totalAmount, 0) - refundedAmount) : 0;
   const selectedOutstandingAmount = Math.max(0, toNumber(selectedCustomer?.creditBalance, 0));
   const selectedCreditLimitAmount = Math.max(0, toNumber(selectedCustomer?.creditLimit, 1000));
   const adjustmentAmount = toNumber(amount, 0);
@@ -226,16 +194,10 @@ export default function WalletManagementPage() {
     : (adjustTarget === "wallet_balance" ? "Prepaid amount available for purchases." : "Debt currently owed by the customer.");
   const targetValueLabel = adjustTarget === "credit_limit" ? "Current limit" : (adjustTarget === "wallet_balance" ? "Current wallet balance" : "Current outstanding");
 
-  const getLedgerDirection = useCallback((tx: any) => {
-    const rawAmount = toNumber(tx?.amount, 0);
-    const normalizedType = String(tx?.type || '').toLowerCase();
-    const isCredit = rawAmount < 0 || normalizedType === 'payment' || normalizedType === 'deposit';
-    return {
-      isCredit,
-      absoluteAmount: Math.abs(rawAmount),
-      signedAmount: rawAmount,
-    };
-  }, []);
+  const rechargeAmountValue = toNumber(amount, 0);
+  const projectedWalletBalance = selectedCustomer
+    ? Math.max(0, toNumber(selectedCustomer.walletBalanceCache, 0)) + rechargeAmountValue
+    : 0;
 
   const ledgerSummary = useMemo(() => {
     return customerHistory.reduce((summary: { creditIn: number; debitOut: number; count: number }, tx: any) => {
@@ -248,150 +210,83 @@ export default function WalletManagementPage() {
       summary.count += 1;
       return summary;
     }, { creditIn: 0, debitOut: 0, count: 0 });
-  }, [customerHistory, getLedgerDirection]);
+  }, [customerHistory]);
 
+  const buildStaffNote = (action: string) =>
+    `${action} by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim();
 
-  const printLedgerEntry = useCallback((tx: any) => {
-    const escapeHtml = (value: unknown) => String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+  const showRechargeReceiptToast = (result: WalletRechargeResult) => {
+    if (!selectedCustomer) return;
 
-    const direction = getLedgerDirection(tx);
-    const createdAt = tx?.createdAt || tx?.transactionDate;
-    const transactionTime = createdAt ? new Date(createdAt).toLocaleString() : '-';
-    const customerName = selectedCustomer?.name || 'Customer';
-    const orderRef = tx?.orderId || tx?.referenceNumber || '-';
-    const balanceAfter = toNumber(tx?.balanceAfter, 0);
-    const notesText = tx?.description || tx?.notes || tx?.reason || '-';
+    const receiptData = {
+      customer: {
+        name: selectedCustomer.name,
+        phone: selectedCustomer.phone,
+        email: selectedCustomer.email,
+      },
+      amount: result.amount ?? rechargeAmountValue,
+      paymentMethod: result.paymentMethod || paymentMethod,
+      referenceNumber,
+      notes: buildStaffNote("Recharge"),
+      balanceBefore: result.balanceBefore,
+      balanceAfter: result.newBalance,
+      transactionId: result.transactionId,
+      entryNo: result.entryNo,
+      staffName: employee?.fullName || employee?.username,
+    };
 
-    const receiptWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!receiptWindow) {
+    toast({
+      title: "Wallet recharged",
+      description: `New balance: Rs. ${Number(result.newBalance ?? 0).toFixed(2)}`,
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => {
+            const printed = printWalletTopUpReceipt(receiptData);
+            if (!printed) {
+              toast({
+                title: "Print blocked",
+                description: "Allow popups to print the payment slip.",
+                variant: "destructive",
+              });
+            }
+          }}
+        >
+          Print receipt
+        </Button>
+      ),
+    });
+  };
+
+  const handlePrintLedgerEntry = (tx: any) => {
+    if (!selectedCustomer) return;
+    const printed = printWalletLedgerReceipt(
+      {
+        name: selectedCustomer.name,
+        phone: selectedCustomer.phone,
+        email: selectedCustomer.email,
+      },
+      tx,
+    );
+    if (!printed) {
       toast({
-        title: "Popup blocked",
-        description: "Please allow popups to print the ledger receipt.",
+        title: "Print blocked",
+        description: "Please allow popups to print the receipt.",
         variant: "destructive",
       });
-      return;
     }
-
-    const title = `Ledger-${customerName}-${tx?.transactionId || tx?.id || Date.now()}`;
-    const html = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>${escapeHtml(title)}</title>
-  <style>
-    @page { size: auto; margin: 5mm; }
-    body { 
-      font-family: 'Inter', -apple-system, sans-serif; 
-      padding: 0; 
-      margin: 0;
-      color: #1a1a1a;
-      background: #fff;
-    }
-    .receipt {
-      max-width: 80mm;
-      margin: 0 auto;
-      padding: 15px;
-      border: 1px dashed #ccc;
-    }
-    .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-    .logo { font-size: 24px; font-weight: 800; letter-spacing: -1px; margin: 0; }
-    .title { font-size: 14px; text-transform: uppercase; font-weight: 600; margin-top: 5px; color: #666; }
-    
-    .customer-box { background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; }
-    .customer-name { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
-    
-    .details { margin-bottom: 15px; }
-    .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 13px; line-height: 1.4; }
-    .label { color: #555; }
-    .value { font-weight: 600; text-align: right; }
-    
-    .amount-box { 
-      border-top: 1px solid #000; 
-      border-bottom: 1px solid #000; 
-      padding: 10px 0; 
-      margin: 15px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .amount-label { font-weight: 700; font-size: 16px; }
-    .amount-value { font-size: 20px; font-weight: 800; }
-    .credit { color: #059669; }
-    .debit { color: #dc2626; }
-    
-    .footer { text-align: center; font-size: 11px; color: #666; margin-top: 20px; }
-    .footer-msg { font-weight: 600; margin-bottom: 4px; color: #333; }
-    
-    @media print {
-      body { padding: 0; }
-      .receipt { border: none; max-width: 100%; }
-    }
-  </style>
-</head>
-<body>
-  <div class="receipt">
-    <div class="header">
-      <h1 class="logo">FAB CLEAN</h1>
-      <div class="title">Transaction Receipt</div>
-    </div>
-
-    <div class="customer-box">
-      <div class="customer-name">${escapeHtml(customerName)}</div>
-      <div style="color: #666;">Date: ${escapeHtml(transactionTime)}</div>
-    </div>
-
-    <div class="details">
-      <div class="row"><span class="label">Type</span><span class="value">${escapeHtml(String(tx?.type || 'Adjustment'))}</span></div>
-      <div class="row"><span class="label">Reference</span><span class="value">${escapeHtml(String(orderRef))}</span></div>
-      <div class="row"><span class="label">Payment Mode</span><span class="value">${escapeHtml(String(tx?.paymentMethod || 'SYSTEM'))}</span></div>
-      <div class="row" style="margin-top: 10px; font-style: italic; color: #666;">
-        <span class="label">Notes</span>
-        <span class="value" style="font-weight: 400;">${escapeHtml(String(notesText))}</span>
-      </div>
-    </div>
-
-    <div class="amount-box">
-      <span class="amount-label">TOTAL AMOUNT</span>
-      <span class="amount-value ${direction.isCredit ? 'credit' : 'debit'}">
-        ${direction.isCredit ? 'Rs. ' : '-Rs. '}${direction.absoluteAmount.toFixed(2)}
-      </span>
-    </div>
-
-    <div class="row" style="background: #f3f4f6; padding: 6px; border-radius: 4px;">
-      <span class="label">Balance After</span>
-      <span class="value">Rs. ${balanceAfter.toFixed(2)}</span>
-    </div>
-
-    <div class="footer">
-      <div class="footer-msg">Thank you for choosing Fab Clean!</div>
-      <div>This is a computer generated receipt.</div>
-      <div style="margin-top: 8px; font-size: 10px;">ID: ${escapeHtml(String(tx?.transactionId || tx?.id || '-'))}</div>
-    </div>
-  </div>
-</body>
-</html>`;
-
-    receiptWindow.document.open();
-    receiptWindow.document.write(html);
-    receiptWindow.document.close();
-    receiptWindow.focus();
-    receiptWindow.print();
-  }, [getLedgerDirection, selectedCustomer?.name, toast]);
+  };
 
   const refreshData = () => {
     refetch();
-    queryClient.invalidateQueries({ queryKey: ["customers"] });
-    queryClient.invalidateQueries({ queryKey: ["credits"] });
+    invalidateWalletQueries(queryClient, selectedCustomer?.id);
   };
 
   const resetDialogState = () => {
     setAmount("");
-    setPaymentMethod("cash");
+    setPaymentMethod("CASH");
     setReferenceNumber("");
     setReason("");
     setNotes("");
@@ -400,14 +295,16 @@ export default function WalletManagementPage() {
   };
 
   const rechargeMutation = useMutation({
-    mutationFn: () => walletApi.recharge(selectedCustomer!.id, {
-      amount: toNumber(amount, 0),
-      paymentMethod,
-      referenceNumber,
-      notes: `Recharge by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
-    }),
-    onSuccess: () => {
-      toast({ title: "Wallet recharged", description: "Customer wallet recharge recorded." });
+    mutationFn: () =>
+      rechargeWallet({
+        customerId: selectedCustomer!.id,
+        amount: rechargeAmountValue,
+        paymentMethod,
+        referenceNumber,
+        notes: buildStaffNote("Recharge"),
+      }),
+    onSuccess: (result) => {
+      showRechargeReceiptToast(result);
       setRechargeOpen(false);
       resetDialogState();
       refreshData();
@@ -418,12 +315,15 @@ export default function WalletManagementPage() {
   });
 
   const refundMutation = useMutation({
-    mutationFn: () => walletApi.refund(selectedCustomer!.id, {
-      amount: Math.abs(toNumber(amount, 0)), // Send positive amount, backend will handle direction
-      refundMethod: paymentMethod,
-      reason: `Refund for Order ${selectedOrder?.orderNumber || "manual"}: ${reason}`,
-      notes: `Refund issued by ${employee?.fullName || employee?.username} (${employee?.employeeId}). Link: ${selectedOrderId || "N/A"}. ${notes || ""}`.trim(),
-    }),
+    mutationFn: () =>
+      refundWallet({
+        customerId: selectedCustomer!.id,
+        amount: Math.abs(toNumber(amount, 0)),
+        refundMethod: paymentMethod,
+        reason: `Refund for Order ${selectedOrder?.orderNumber || "manual"}: ${reason}`,
+        notes: buildStaffNote("Refund"),
+        orderId: selectedOrderId || undefined,
+      }),
     onSuccess: () => {
       toast({ title: "Refund recorded", description: "Refund entry has been posted." });
       setRefundOpen(false);
@@ -436,12 +336,14 @@ export default function WalletManagementPage() {
   });
 
   const creditPaymentMutation = useMutation({
-    mutationFn: () => walletApi.payCredit(selectedCustomer!.id, {
-      amount: toNumber(amount, 0),
-      paymentMethod,
-      referenceNumber,
-      notes: `Credit payment by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
-    }),
+    mutationFn: () =>
+      payCredit({
+        customerId: selectedCustomer!.id,
+        amount: toNumber(amount, 0),
+        paymentMethod,
+        referenceNumber,
+        notes: buildStaffNote("Credit payment"),
+      }),
     onSuccess: () => {
       toast({ title: "Credit payment recorded", description: "Outstanding credit has been reduced." });
       setCreditPaymentOpen(false);
@@ -454,17 +356,19 @@ export default function WalletManagementPage() {
   });
 
   const adjustMutation = useMutation({
-    mutationFn: () => walletApi.adjust(selectedCustomer!.id, {
-      amount: toNumber(amount, 0),
-      target: adjustTarget,
-      reason: reason || "Manual adjustment",
-      notes: `Adjustment by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
-    }),
+    mutationFn: () =>
+      adjustBalance({
+        customerId: selectedCustomer!.id,
+        amount: toNumber(amount, 0),
+        target: adjustTarget as "outstanding" | "wallet_balance" | "credit_limit",
+        reason: reason || "Manual adjustment",
+        notes: buildStaffNote("Adjustment"),
+      }),
     onSuccess: () => {
       toast({ title: "Balance adjusted", description: "Manual adjustment posted successfully." });
       setAdjustOpen(false);
       resetDialogState();
-      refetch(); // Explicitly trigger refetch to push it down fast
+      refreshData();
     },
     onError: (error: Error) => {
       toast({ title: "Adjustment failed", description: error.message, variant: "destructive" });
@@ -745,7 +649,7 @@ export default function WalletManagementPage() {
                                 <RefreshCw className="mr-2 h-4 w-4" /> View History
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              {canAdjust && (
+                              {canManageWalletActions && (
                                 <DropdownMenuItem onClick={() => {
                                   resetDialogState();
                                   setSelectedCustomer(row);
@@ -755,7 +659,7 @@ export default function WalletManagementPage() {
                                   <HandCoins className="mr-2 h-4 w-4" /> Issue Refund
                                 </DropdownMenuItem>
                               )}
-                              {canAdjust && (
+                              {canManageWalletActions && (
                                 <DropdownMenuItem onClick={() => {
                                   resetDialogState();
                                   setSelectedCustomer(row);
@@ -860,7 +764,7 @@ export default function WalletManagementPage() {
                               <RefreshCw className="mr-2 h-4 w-4" /> View History
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {canAdjust && (
+                            {canManageWalletActions && (
                               <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation();
                                 resetDialogState();
@@ -869,6 +773,16 @@ export default function WalletManagementPage() {
                                 setReason("Wallet refund");
                               }}>
                                 <HandCoins className="mr-2 h-4 w-4" /> Issue Refund
+                              </DropdownMenuItem>
+                            )}
+                            {canManageWalletActions && (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                resetDialogState();
+                                setSelectedCustomer(row);
+                                setAdjustOpen(true);
+                              }}>
+                                <IndianRupee className="mr-2 h-4 w-4" /> Manual Adjustment
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -900,18 +814,29 @@ export default function WalletManagementPage() {
             <div className="space-y-2">
               <Label>Amount</Label>
               <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <div className="flex flex-wrap gap-2 pt-1">
+                {RECHARGE_QUICK_AMOUNTS.map((quickAmount) => (
+                  <Button
+                    key={quickAmount}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAmount(String(quickAmount))}
+                  >
+                    +Rs. {quickAmount}
+                  </Button>
+                ))}
+              </div>
+              {selectedCustomer && rechargeAmountValue > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Current: Rs. {selectedWalletAmount.toFixed(2)} → After recharge: Rs. {projectedWalletBalance.toFixed(2)}
+                </p>
+              )}
             </div>
             <div className="space-y-4">
               <Label className="text-sm font-semibold">Payment Method</Label>
               <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'cash', name: 'Cash', icon: <Banknote className="w-4 h-4" /> },
-                  { id: 'upi', name: 'UPI', icon: <Smartphone className="w-4 h-4" /> },
-                  { id: 'card', name: 'Card', icon: <CreditCard className="w-4 h-4" /> },
-                  { id: 'net_banking', name: 'Net Banking', icon: <Building className="w-4 h-4" /> },
-                  { id: 'cheque', name: 'Cheque', icon: <FileText className="w-4 h-4" /> },
-                  { id: 'other', name: 'Other', icon: <Search className="w-4 h-4" /> }
-                ].map((method) => (
+                {WALLET_PAYMENT_METHODS.map((method) => (
                   <Button
                     key={method.id}
                     type="button"
@@ -922,7 +847,7 @@ export default function WalletManagementPage() {
                     )}
                     onClick={() => setPaymentMethod(method.id)}
                   >
-                    {method.icon}
+                    {PAYMENT_METHOD_ICONS[method.id]}
                     <span className="text-sm">{method.name}</span>
                   </Button>
                 ))}
@@ -984,9 +909,9 @@ export default function WalletManagementPage() {
                   {customerOrders.length === 0 ? (
                     <div className="p-2 text-sm text-muted-foreground">No orders found</div>
                   ) : (
-                    customerOrders.map((order: any) => (
+                    (customerOrders as WalletCustomerOrder[]).map((order) => (
                       <SelectItem key={order.id} value={order.id}>
-                        {order.orderNumber} - Rs. {parseFloat(order.totalAmount || "0").toFixed(2)} ({new Date(order.createdAt).toLocaleDateString()})
+                        {order.orderNumber} - Rs. {toNumber(order.totalAmount, 0).toFixed(2)} ({order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "—"})
                       </SelectItem>
                     ))
                   )}
@@ -1104,14 +1029,7 @@ export default function WalletManagementPage() {
             <div className="space-y-4">
               <Label className="text-sm font-semibold">Payment Method</Label>
               <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'cash', name: 'Cash', icon: <Banknote className="w-4 h-4" /> },
-                  { id: 'upi', name: 'UPI', icon: <Smartphone className="w-4 h-4" /> },
-                  { id: 'card', name: 'Card', icon: <CreditCard className="w-4 h-4" /> },
-                  { id: 'net_banking', name: 'Net Banking', icon: <Building className="w-4 h-4" /> },
-                  { id: 'cheque', name: 'Cheque', icon: <FileText className="w-4 h-4" /> },
-                  { id: 'other', name: 'Other', icon: <Search className="w-4 h-4" /> }
-                ].map((method) => (
+                {WALLET_PAYMENT_METHODS.map((method) => (
                   <Button
                     key={method.id}
                     type="button"
@@ -1122,7 +1040,7 @@ export default function WalletManagementPage() {
                     )}
                     onClick={() => setPaymentMethod(method.id)}
                   >
-                    {method.icon}
+                    {PAYMENT_METHOD_ICONS[method.id]}
                     <span className="text-sm">{method.name}</span>
                   </Button>
                 ))}
@@ -1298,7 +1216,7 @@ export default function WalletManagementPage() {
                           </div>
                           <div>
                             <p className="font-semibold text-sm capitalize flex items-center flex-wrap gap-2">
-                              {tx.type}
+                              {tx.transactionType || tx.type}
                               {tx.orderId && (
                                 <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400">
                                   Order: {typeof tx.orderId === 'string' ? tx.orderId.substring(0, 8) : tx.orderId}
@@ -1317,8 +1235,8 @@ export default function WalletManagementPage() {
                               )}
                             </p>
                             <p className="text-[10px] text-muted-foreground mt-1 font-mono">
-                              Credit ID: {tx.creditId || selectedCustomer?.id || "-"}
-                              {tx.transactionId ? ` • Txn: ${tx.transactionId}` : ""}
+                              {tx.transactionId ? `Txn: ${tx.transactionId}` : ""}
+                              {tx.entryNo ? ` • Entry: ${tx.entryNo}` : ""}
                             </p>
                           </div>
                         </div>
@@ -1331,7 +1249,7 @@ export default function WalletManagementPage() {
                             variant="ghost"
                             size="sm"
                             className="mt-1 h-7 px-2 text-[10px] text-slate-600 hover:text-slate-900"
-                            onClick={() => printLedgerEntry(tx)}
+                            onClick={() => handlePrintLedgerEntry(tx)}
                           >
                             <Printer className="h-3 w-3 mr-1" />
                             Print

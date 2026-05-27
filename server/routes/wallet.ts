@@ -1,7 +1,7 @@
 /**
  * Wallet Management Routes
  *
- * Handles all wallet recharge and related operations.
+ * Handles wallet recharge, refunds, and related ledger operations.
  */
 
 import { Router } from 'express';
@@ -12,43 +12,53 @@ import { AuthService } from '../auth-service';
 
 const router = Router();
 
-// Only authenticated store/admin roles can perform external top-ups
 const WALLET_MANAGE_ROLES = ['admin', 'store_manager', 'store_staff'];
 const WALLET_READ_ROLES = ['admin', 'store_manager', 'store_staff', 'factory_manager'];
 
 router.use(jwtRequired);
 
+function normalizePaymentMethod(value: unknown): string {
+  const raw = String(value || 'CASH').trim().toUpperCase().replace(/\s+/g, '_');
+  const allowed = new Set([
+    'CASH', 'UPI', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'NET_BANKING', 'OTHER',
+    'WALLET_REFUND', 'WALLET_ADJUSTMENT',
+  ]);
+  return allowed.has(raw) ? raw : 'OTHER';
+}
+
 /**
  * POST /api/wallet/recharge
- * Top up a customer's wallet balance (Workflow A)
+ * Top up a customer's wallet balance
  */
 router.post('/recharge', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
     try {
-        const { customerId, amount, paymentMethod } = req.body;
+        const { customerId, amount, paymentMethod, referenceNumber, notes } = req.body;
 
         if (!customerId || !amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
             return res.status(400).json(createErrorResponse('Valid customerId and positive amount are required', 400));
         }
 
         const rechargeAmount = parseFloat(amount);
+        const normalizedMethod = normalizePaymentMethod(paymentMethod);
         const recordedBy = req.employee?.id || null;
         const recordedByName = req.employee?.username || 'system';
 
-        // Using ACID-compliant RPC method in SupabaseStorage
-        // This handles: Customer balance update, transactions insert, and credit_transactions insert all at once.
         const result = await (storage as any).processWalletRecharge(
             customerId,
             rechargeAmount,
-            paymentMethod || 'CASH',
+            normalizedMethod,
             recordedBy,
-            recordedByName
+            recordedByName,
+            {
+                referenceNumber: referenceNumber ? String(referenceNumber).trim() : undefined,
+                notes: notes ? String(notes).trim() : undefined,
+            }
         );
 
         if (!result.success) {
             throw new Error(result.error);
         }
 
-        // Log the action
         if (req.employee) {
             await AuthService.logAction(
                 req.employee.employeeId,
@@ -58,15 +68,25 @@ router.post('/recharge', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
                 customerId,
                 {
                     amount: rechargeAmount,
-                    paymentMethod,
-                    newBalance: result.newBalance
+                    paymentMethod: normalizedMethod,
+                    referenceNumber: referenceNumber || null,
+                    newBalance: result.newBalance,
+                    transactionId: result.transactionId,
                 },
                 req.ip || req.connection.remoteAddress,
                 req.get('user-agent')
             );
         }
 
-        res.json(createSuccessResponse({ newBalance: result.newBalance }, 'Wallet recharged successfully'));
+        res.json(createSuccessResponse({
+            newBalance: result.newBalance,
+            balanceBefore: result.balanceBefore,
+            transactionId: result.transactionId,
+            id: result.id,
+            entryNo: result.entryNo,
+            paymentMethod: result.paymentMethod || normalizedMethod,
+            amount: result.amount ?? rechargeAmount,
+        }, 'Wallet recharged successfully'));
     } catch (error: any) {
         console.error('Wallet recharge error:', error);
         res.status(500).json(createErrorResponse(`Failed to recharge wallet: ${error.message}`, 500));
@@ -91,29 +111,27 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
         const method = refundMethod?.toLowerCase() || 'cash';
 
         if (method === 'wallet') {
-            // Using ACID-compliant RPC method to increase wallet balance
             const result = await (storage as any).processWalletRecharge(
                 customerId,
                 refundAmount,
                 'WALLET_REFUND',
                 recordedBy,
-                recordedByName
+                recordedByName,
+                { notes: [reason, notes].filter(Boolean).join(' — ') || undefined }
             );
 
             if (!result.success) {
                 throw new Error(result.error);
             }
-            
-            // Also log in transactions for refund tracking
+
             await (storage as any).processRefundOut(
-                customerId, 
-                refundAmount, 
-                'WALLET', 
-                reason || 'Wallet Refund', 
+                customerId,
+                refundAmount,
+                'WALLET',
+                reason || 'Wallet Refund',
                 orderId
             );
 
-            // Log the action
             if (req.employee) {
                 await AuthService.logAction(
                     req.employee.employeeId,
@@ -127,7 +145,7 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
                         newBalance: result.newBalance,
                         reason,
                         notes,
-                        orderId
+                        orderId,
                     },
                     req.ip || req.connection.remoteAddress,
                     req.get('user-agent')
@@ -136,11 +154,10 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
 
             res.json(createSuccessResponse({ newBalance: result.newBalance }, 'Refund processed to wallet successfully'));
         } else {
-            // Cash, Bank Transfer, UPI, etc (Money leaving the system)
             let formattedMethod = 'CASH';
             if (method === 'upi') formattedMethod = 'UPI';
             if (method === 'bank_transfer') formattedMethod = 'BANK_TRANSFER';
-            
+
             const result = await (storage as any).processRefundOut(
                 customerId,
                 refundAmount,
@@ -153,7 +170,6 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
                 throw new Error(result.error);
             }
 
-            // Log the action
             if (req.employee) {
                 await AuthService.logAction(
                     req.employee.employeeId,
@@ -166,7 +182,7 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
                         paymentMethod: formattedMethod,
                         reason,
                         notes,
-                        orderId
+                        orderId,
                     },
                     req.ip || req.connection.remoteAddress,
                     req.get('user-agent')
