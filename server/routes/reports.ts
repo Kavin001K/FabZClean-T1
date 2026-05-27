@@ -1217,4 +1217,754 @@ router.get("/kpi-snapshot", async (req, res) => {
   }
 });
 
+// Ask AI Reports Assistant endpoint
+router.post(["/ask-ai", "/ask-ace"], async (req, res) => {
+  try {
+    const { question, history } = req.body || {};
+
+    if (!question || typeof question !== "string" || question.trim().length === 0) {
+      res.status(400).json({ success: false, message: "question is required" });
+      return;
+    }
+
+    const q = question.trim();
+    const qLower = q.toLowerCase();
+
+    // 1. Fetch data for entity resolution & general overview context
+    const allCustomers = await listAllCustomers();
+    const allEmployees = (await storage.listEmployees()) as any[];
+    const rawOrders = (await storage.listOrders()) as any[];
+
+    // Entity lookup matching logic (Multiple Matches Support!)
+    let matchedCustomers: any[] = [];
+    let matchedEmployees: any[] = [];
+    let matchedOrders: any[] = [];
+    let matchedStores: any[] = [];
+    let matchedStoreOrders: any[] = []; // Fix ReferenceError
+
+    const STOP_WORDS = new Set([
+      'all', 'with', 'name', 'their', 'list', 'show', 'find', 'get', 'who', 'which', 
+      'what', 'how', 'where', 'why', 'the', 'for', 'and', 'this', 'that', 'them', 
+      'they', 'here', 'info', 'details', 'detail', 'profile', 'profiles', 'customer', 
+      'customers', 'store', 'stores', 'employee', 'employees', 'order', 'orders', 
+      'about', 'some', 'from', 'have', 'has', 'had', 'been', 'were', 'was', 'are', 'is'
+    ]);
+
+    // Find all customers whose names contain any word in the query or vice-versa
+    const sortedCustomers = [...allCustomers].sort((a, b) => (b.name || '').length - (a.name || '').length);
+    for (const c of sortedCustomers) {
+      if (!c.name) continue;
+      const cNameLower = c.name.toLowerCase();
+      if (qLower.includes(cNameLower) || cNameLower.includes(qLower)) {
+        matchedCustomers.push(c);
+      } else {
+        const queryWords = qLower.split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
+        const nameWords = cNameLower.split(/\s+/);
+        const wordMatch = queryWords.some(qw => nameWords.some(nw => nw.startsWith(qw) || nw.includes(qw)));
+        if (wordMatch) {
+          matchedCustomers.push(c);
+        }
+      }
+    }
+    
+    // Fallback: match by phone number
+    if (matchedCustomers.length === 0) {
+      for (const c of allCustomers) {
+        if (!c.phone) continue;
+        if (qLower.includes(c.phone)) {
+          matchedCustomers.push(c);
+        }
+      }
+    }
+
+    // Find all matching stores
+    let catalogStores: any[] = [];
+    try {
+      catalogStores = await (storage as any).listStores?.({ isActive: true }) || [];
+    } catch {
+      catalogStores = [];
+    }
+    for (const s of catalogStores) {
+      const sName = String(s.name || '').toLowerCase();
+      const sCode = String(s.code || s.id || '').toLowerCase();
+      if (qLower.includes(sName) || qLower.includes(sCode)) {
+        matchedStores.push(s);
+      }
+    }
+    
+    const storeCodes = ["POL", "KIN", "MCET", "UDM"];
+    for (const code of storeCodes) {
+      const name = getStoreName(code).toLowerCase();
+      if (qLower.includes(code.toLowerCase()) || qLower.includes(name)) {
+        if (!matchedStores.some(s => String(s.code || s.id).toUpperCase() === code)) {
+          matchedStores.push({ code, name: getStoreName(code) });
+        }
+      }
+    }
+
+    if (matchedStores.length > 0) {
+      matchedStores.forEach(s => {
+        const code = String(s.code || s.id).toUpperCase();
+        const sOrders = rawOrders.filter((o: any) => String(o.storeCode || o.storeId || '').toUpperCase() === code);
+        matchedStoreOrders.push(...sOrders);
+      });
+    }
+
+    // Find all matching employees
+    for (const emp of allEmployees) {
+      const firstName = String(emp.firstName || '').toLowerCase();
+      const lastName = String(emp.lastName || '').toLowerCase();
+      const fullName = `${firstName} ${lastName}`.trim();
+      const empCode = String(emp.employeeId || emp.id || '').toLowerCase();
+      
+      if (
+        (fullName.length > 2 && qLower.includes(fullName)) ||
+        (firstName.length > 2 && qLower.includes(firstName)) ||
+        qLower.includes(empCode)
+      ) {
+        matchedEmployees.push(emp);
+      }
+    }
+
+    // Find all matching orders
+    // Support matching by full order code (e.g. FZC01MG01OR0001), or by last 4 digits (e.g. 0001)
+    const ordMatch = qLower.match(/\b(ord-\d+|\d{4,})\b/i);
+    const fourDigitMatch = qLower.match(/\b\d{4}\b/);
+    
+    if (ordMatch || fourDigitMatch) {
+      const matchTerm = ordMatch ? ordMatch[0] : fourDigitMatch![0];
+      const matches = rawOrders.filter((o: any) => {
+        const oNum = String(o.orderNumber || o.order_number || o.id || '').toLowerCase();
+        return oNum.includes(matchTerm) || oNum.endsWith(matchTerm);
+      });
+      if (matches.length > 0) {
+        matchedOrders.push(...matches.slice(0, 5));
+      }
+    } else {
+      for (const o of rawOrders) {
+        const orderNum = String(o.orderNumber || o.order_number || '').toLowerCase();
+        if (orderNum && qLower.includes(orderNum)) {
+          matchedOrders.push(o);
+          break;
+        }
+      }
+    }
+
+    // If no entities matched the current query, carry over resolved entities from the previous user queries in history
+    if (matchedCustomers.length === 0 && matchedStores.length === 0 && matchedEmployees.length === 0 && matchedOrders.length === 0) {
+      if (Array.isArray(history) && history.length > 0) {
+        const lastUserMsg = [...history].reverse().find((msg: any) => msg.sender === 'user' && typeof msg.text === 'string' && msg.text.trim().length > 0);
+        if (lastUserMsg) {
+          const prevQLower = lastUserMsg.text.toLowerCase();
+          
+          // Match customers:
+          for (const c of sortedCustomers) {
+            if (!c.name) continue;
+            const cNameLower = c.name.toLowerCase();
+            if (prevQLower.includes(cNameLower) || cNameLower.includes(prevQLower)) {
+              matchedCustomers.push(c);
+            } else {
+              const queryWords = prevQLower.split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
+              const nameWords = cNameLower.split(/\s+/);
+              const wordMatch = queryWords.some(qw => nameWords.some(nw => nw.startsWith(qw) || nw.includes(qw)));
+              if (wordMatch) {
+                matchedCustomers.push(c);
+              }
+            }
+          }
+          
+          // Match stores:
+          for (const s of catalogStores) {
+            const sName = String(s.name || '').toLowerCase();
+            const sCode = String(s.code || s.id || '').toLowerCase();
+            if (prevQLower.includes(sName) || prevQLower.includes(sCode)) {
+              matchedStores.push(s);
+            }
+          }
+          for (const code of storeCodes) {
+            const name = getStoreName(code).toLowerCase();
+            if (prevQLower.includes(code.toLowerCase()) || prevQLower.includes(name)) {
+              if (!matchedStores.some(s => String(s.code || s.id).toUpperCase() === code)) {
+                matchedStores.push({ code, name: getStoreName(code) });
+              }
+            }
+          }
+          
+          // Match employees:
+          for (const emp of allEmployees) {
+            const firstName = String(emp.firstName || '').toLowerCase();
+            const lastName = String(emp.lastName || '').toLowerCase();
+            const fullName = `${firstName} ${lastName}`.trim();
+            const empCode = String(emp.employeeId || emp.id || '').toLowerCase();
+            if (
+              (fullName.length > 2 && prevQLower.includes(fullName)) ||
+              (firstName.length > 2 && prevQLower.includes(firstName)) ||
+              prevQLower.includes(empCode)
+            ) {
+              matchedEmployees.push(emp);
+            }
+          }
+          
+          // Match orders:
+          const prevOrdMatch = prevQLower.match(/\b(ord-\d+|\d{4,})\b/i);
+          const prevFourDigitMatch = prevQLower.match(/\b\d{4}\b/);
+          if (prevOrdMatch || prevFourDigitMatch) {
+            const prevMatchTerm = prevOrdMatch ? prevOrdMatch[0] : prevFourDigitMatch![0];
+            const prevMatches = rawOrders.filter((o: any) => {
+              const oNum = String(o.orderNumber || o.order_number || o.id || '').toLowerCase();
+              return oNum.includes(prevMatchTerm) || oNum.endsWith(prevMatchTerm);
+            });
+            if (prevMatches.length > 0) {
+              matchedOrders.push(...prevMatches.slice(0, 5));
+            }
+          }
+        }
+      }
+    }
+
+    // INTENT-BASED DYNAMIC FILTERING
+    // 1. Dues/Credit intent
+    const isCreditIntent = qLower.includes("owe") || qLower.includes("credit") || qLower.includes("due") || qLower.includes("outstanding") || qLower.includes("debt");
+    let customersWithDues: any[] = [];
+    if (isCreditIntent) {
+      customersWithDues = allCustomers
+        .filter(c => (Number(c.creditBalance || c.credit_balance) || 0) > 0)
+        .sort((a, b) => (Number(b.creditBalance || b.credit_balance) || 0) - (Number(a.creditBalance || a.credit_balance) || 0));
+    }
+
+    // 2. Status intent
+    const isPendingIntent = qLower.includes("pending");
+    const isProcessingIntent = qLower.includes("processing") || qLower.includes("in progress") || qLower.includes("work");
+    const isCompletedIntent = qLower.includes("completed") || qLower.includes("delivered") || qLower.includes("done");
+    
+    let filteredOrdersByStatus: any[] = [];
+    let statusLabel = "";
+    if (isPendingIntent) {
+      filteredOrdersByStatus = rawOrders.filter(o => o.status === 'pending');
+      statusLabel = "pending";
+    } else if (isProcessingIntent) {
+      filteredOrdersByStatus = rawOrders.filter(o => ['processing', 'assigned', 'ready_for_pickup', 'ready_for_transit', 'in_progress'].includes(o.status));
+      statusLabel = "processing";
+    } else if (isCompletedIntent) {
+      filteredOrdersByStatus = rawOrders.filter(o => ['completed', 'delivered'].includes(o.status));
+      statusLabel = "completed";
+    }
+
+    // 3. Timeframe intent
+    const isTimeframeIntent = qLower.includes("last") || qLower.includes("recent") || qLower.includes("today") || qLower.includes("days");
+    let filteredOrdersByTime: any[] = [];
+    if (isTimeframeIntent) {
+      const now = new Date();
+      let limitDate = new Date();
+      if (qLower.includes("today")) {
+        limitDate.setDate(now.getDate() - 1);
+      } else if (qLower.includes("7 days") || qLower.includes("week")) {
+        limitDate.setDate(now.getDate() - 7);
+      } else {
+        limitDate.setDate(now.getDate() - 30);
+      }
+      filteredOrdersByTime = rawOrders.filter(o => o.createdAt && new Date(o.createdAt) >= limitDate);
+    }
+
+    // Format matched entity details to provide context
+    const entityContext: any = {
+      matchedCustomersCount: matchedCustomers.length,
+      matchedCustomers: matchedCustomers.slice(0, 15).map(c => {
+        const cOrders = rawOrders.filter(o => 
+          String(o.customerId || '') === String(c.id || '') ||
+          String(o.customerPhone || '') === String(c.phone || '')
+        );
+        const spent = cOrders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+        return {
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          phone: c.phone,
+          creditBalance: c.creditBalance || c.credit_balance || 0,
+          walletBalance: c.walletBalanceCache || c.wallet_balance_cache || 0,
+          totalOrders: cOrders.length,
+          totalSpent: spent
+        };
+      }),
+      matchedCustomerOrdersCount: rawOrders.filter(o => matchedCustomers.some(c => 
+        String(o.customerId || '') === String(c.id || '') ||
+        String(o.customerPhone || '') === String(c.phone || '')
+      )).length,
+      matchedCustomerOrders: rawOrders
+        .filter(o => matchedCustomers.some(c => 
+          String(o.customerId || '') === String(c.id || '') ||
+          String(o.customerPhone || '') === String(c.phone || '')
+        ))
+        .slice(0, 10)
+        .map(o => ({
+          orderNumber: o.orderNumber || o.order_number,
+          customerName: o.customerName,
+          totalAmount: o.totalAmount,
+          status: o.status,
+          createdAt: o.createdAt,
+          items: parseOrderItems(o.items).slice(0, 5).map(item => `${item.quantity}x ${item.serviceName}`)
+        })),
+      matchedStores: matchedStores.map(s => {
+        const sCode = String(s.code || s.id).toUpperCase();
+        const sOrders = rawOrders.filter(o => String(o.storeCode || o.storeId || '').toUpperCase() === sCode);
+        const activeOrders = sOrders.filter(o => o.status !== 'cancelled');
+        const rev = activeOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+        return {
+          name: s.name,
+          code: sCode,
+          totalOrders: sOrders.length,
+          totalRevenue: rev,
+          pendingOrders: activeOrders.filter(o => !isOrderComplete(o)).length,
+          completedOrders: activeOrders.filter(isOrderComplete).length
+        };
+      }),
+      matchedStoreOrdersCount: matchedStoreOrders.length,
+      matchedStoreOrders: matchedStoreOrders
+        .slice(0, 10)
+        .map(o => ({
+          orderNumber: o.orderNumber || o.order_number,
+          customerName: o.customerName,
+          totalAmount: o.totalAmount,
+          status: o.status,
+          createdAt: o.createdAt,
+          items: parseOrderItems(o.items).slice(0, 5).map(item => `${item.quantity}x ${item.serviceName}`)
+        })),
+      matchedEmployees: matchedEmployees.map(emp => {
+        const empId = String(emp.id || emp.employeeId || '');
+        const empOrders = rawOrders.filter(o => String(o.employeeId || o.createdBy || o.assignedTo || '') === empId);
+        const activeOrders = empOrders.filter(o => o.status !== 'cancelled');
+        const rev = activeOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+        return {
+          name: `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.name,
+          role: emp.role,
+          storeId: emp.storeId || emp.franchiseId,
+          ordersHandled: empOrders.length,
+          revenueTouched: rev,
+          completionRate: empOrders.length > 0 
+            ? (empOrders.filter(isOrderComplete).length / empOrders.length) * 100 
+            : 0
+        };
+      }),
+      matchedEmployeeOrdersCount: rawOrders.filter(o => matchedEmployees.some(emp => 
+        String(o.employeeId || o.createdBy || o.assignedTo || '') === String(emp.id || emp.employeeId || '')
+      )).length,
+      matchedEmployeeOrders: rawOrders
+        .filter(o => matchedEmployees.some(emp => 
+          String(o.employeeId || o.createdBy || o.assignedTo || '') === String(emp.id || emp.employeeId || '')
+        ))
+        .slice(0, 10)
+        .map(o => ({
+          orderNumber: o.orderNumber || o.order_number,
+          customerName: o.customerName,
+          totalAmount: o.totalAmount,
+          status: o.status,
+          createdAt: o.createdAt,
+          items: parseOrderItems(o.items).slice(0, 5).map(item => `${item.quantity}x ${item.serviceName}`)
+        })),
+      matchedOrders: matchedOrders.map(o => ({
+        orderNumber: o.orderNumber || o.order_number,
+        customerName: o.customerName,
+        customerPhone: o.customerPhone,
+        status: o.status,
+        paymentStatus: o.paymentStatus || 'pending',
+        totalAmount: o.totalAmount,
+        createdAt: o.createdAt,
+        pickupDate: o.pickupDate || o.dueDate,
+        deliveredAt: o.deliveredAt,
+        storeCode: o.storeCode,
+        specialInstructions: o.specialInstructions || '',
+        items: parseOrderItems(o.items).map(item => `${item.quantity}x ${item.serviceName} (₹${item.price})`)
+      })),
+      isCreditQuery: isCreditIntent,
+      customersWithDuesCount: customersWithDues.length,
+      customersWithDues: customersWithDues.slice(0, 10).map(c => ({
+        name: c.name,
+        phone: c.phone,
+        creditBalance: c.creditBalance || c.credit_balance || 0
+      })),
+      isStatusQuery: filteredOrdersByStatus.length > 0,
+      statusLabel,
+      filteredOrdersByStatusCount: filteredOrdersByStatus.length,
+      filteredOrdersByStatus: filteredOrdersByStatus.slice(0, 10).map(o => ({
+        orderNumber: o.orderNumber || o.order_number,
+        customerName: o.customerName,
+        totalAmount: o.totalAmount,
+        createdAt: o.createdAt,
+        storeCode: o.storeCode
+      })),
+      isTimeframeQuery: filteredOrdersByTime.length > 0,
+      filteredOrdersByTimeCount: filteredOrdersByTime.length,
+      filteredOrdersByTime: filteredOrdersByTime.slice(0, 10).map(o => ({
+        orderNumber: o.orderNumber || o.order_number,
+        customerName: o.customerName,
+        totalAmount: o.totalAmount,
+        status: o.status,
+        createdAt: o.createdAt
+      }))
+    };
+
+    // Build the general reports overview over the last 365 days of operations
+    const contextReq = {
+      ...req,
+      query: { days: "365" }
+    };
+    const reportData = await buildReportOverview(contextReq);
+
+    // Format a concise JSON context for the prompt
+    const dbSummary = {
+      meta: {
+        startDate: reportData.meta.startDate,
+        endDate: reportData.meta.endDate,
+        days: reportData.meta.days,
+        scopedStore: reportData.meta.scopedStore
+      },
+      summary: {
+        totalRevenue: reportData.summary.totalRevenue,
+        totalOrders: reportData.summary.totalOrders,
+        totalCustomers: reportData.summary.totalCustomers,
+        totalEmployees: reportData.summary.totalEmployees,
+        averageOrderValue: reportData.summary.averageOrderValue,
+        completedOrders: reportData.summary.completedOrders,
+        pendingOrders: reportData.summary.pendingOrders,
+        creditOutstanding: reportData.summary.creditOutstanding,
+        walletBalance: reportData.summary.walletBalance,
+        completionRate: reportData.summary.completionRate
+      },
+      pnl: {
+        revenue: reportData.pnl.revenue,
+        totalExpenses: reportData.pnl.totalExpenses,
+        netProfit: reportData.pnl.netProfit,
+        profitMargin: reportData.pnl.profitMargin,
+        expenseByCategory: reportData.pnl.expenseByCategory
+      },
+      franchisePerformance: reportData.franchisePerformance.map(f => ({
+        storeName: f.storeName,
+        franchiseCode: f.franchiseCode,
+        totalRevenue: f.totalRevenue,
+        totalOrders: f.totalOrders,
+        avgOrderValue: f.avgOrderValue,
+        pendingOrders: f.pendingOrders,
+        creditOutstanding: f.creditOutstanding,
+        topService: f.topService
+      })),
+      topServices: reportData.topServices.map(s => ({
+        name: s.name,
+        orderCount: s.orderCount,
+        itemCount: s.itemCount,
+        revenue: s.revenue,
+        avgTicket: s.avgTicket,
+        topStore: s.topStore
+      })),
+      topCustomers: reportData.topCustomers.map(c => ({
+        customerName: c.customerName,
+        orders: c.orders,
+        revenue: c.revenue,
+        creditBalance: c.creditBalance,
+        topServices: c.topServices
+      }))
+    };
+
+    // Calculate Monthly Comparison Context (Real-time analytics for the AI)
+    const now = new Date();
+    const { start: startOfToday } = getIstDayBounds(now);
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last30DaysStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const lastMonthSameDay = new Date(now);
+    lastMonthSameDay.setMonth(now.getMonth() - 1);
+    if (lastMonthSameDay.getDate() !== now.getDate()) {
+      lastMonthSameDay.setDate(0); // Last day of previous month
+    }
+    const lmsdStart = new Date(lastMonthSameDay.getFullYear(), lastMonthSameDay.getMonth(), lastMonthSameDay.getDate(), 0, 0, 0);
+    const lmsdEnd = new Date(lastMonthSameDay.getFullYear(), lastMonthSameDay.getMonth(), lastMonthSameDay.getDate(), 23, 59, 59, 999);
+
+    const activeOrders = rawOrders.filter((o: any) => o.status !== 'cancelled' && o.status !== 'refunded' && o.status !== 'deleted');
+    
+    const todayOrders = activeOrders.filter((o: any) => o.createdAt && new Date(o.createdAt) >= startOfToday);
+    const todayRevenue = todayOrders.reduce((sum: number, o: any) => sum + toNumber(o.totalAmount), 0);
+    
+    const thisMonthOrders = activeOrders.filter((o: any) => o.createdAt && new Date(o.createdAt) >= startOfThisMonth);
+    const thisMonthRevenue = thisMonthOrders.reduce((sum: number, o: any) => sum + toNumber(o.totalAmount), 0);
+    
+    const lmsdOrders = activeOrders.filter((o: any) => {
+      const d = new Date(o.createdAt);
+      return d >= lmsdStart && d <= lmsdEnd;
+    });
+    const lmsdRevenue = lmsdOrders.reduce((sum: number, o: any) => sum + toNumber(o.totalAmount), 0);
+    
+    const last30DaysOrders = activeOrders.filter((o: any) => o.createdAt && new Date(o.createdAt) >= last30DaysStart);
+    const last30DaysRevenue = last30DaysOrders.reduce((sum: number, o: any) => sum + toNumber(o.totalAmount), 0);
+    
+    const newCustomersThisMonth = allCustomers.filter((c: any) => 
+      c.createdAt && new Date(c.createdAt) >= startOfThisMonth
+    ).length;
+    const newCustomersLast30Days = allCustomers.filter((c: any) => 
+      c.createdAt && new Date(c.createdAt) >= last30DaysStart
+    ).length;
+    const newCustomersToday = allCustomers.filter((c: any) => 
+      c.createdAt && new Date(c.createdAt) >= startOfToday
+    ).length;
+
+    const getGrowth = (current: number, previous: number) => {
+      if (previous > 0) return ((current - previous) / previous) * 100;
+      return current > 0 ? 100 : 0;
+    };
+
+    const monthlyComparisons = {
+      today: {
+        revenue: todayRevenue,
+        orders: todayOrders.length,
+        newCustomers: newCustomersToday
+      },
+      lastMonthSameDay: {
+        revenue: lmsdRevenue,
+        orders: lmsdOrders.length,
+        growthPercentage: parseFloat(getGrowth(todayRevenue, lmsdRevenue).toFixed(1)),
+        growthDifference: todayRevenue - lmsdRevenue
+      },
+      thisMonth: {
+        revenue: thisMonthRevenue,
+        orders: thisMonthOrders.length,
+        newCustomers: newCustomersThisMonth
+      },
+      last30Days: {
+        revenue: last30DaysRevenue,
+        orders: last30DaysOrders.length,
+        newCustomers: newCustomersLast30Days
+      }
+    };
+
+    let historyText = "";
+    if (Array.isArray(history) && history.length > 0) {
+      const actualHistory = history.filter((msg: any) => {
+        if (!msg || typeof msg.text !== 'string') return false;
+        if (msg.text.includes("Ask AI Reports Assistant") || msg.text.includes("Ask Ace Reports Assistant")) return false;
+        return true;
+      });
+
+      if (actualHistory.length > 0) {
+        historyText = actualHistory
+          .slice(-8)
+          .map((msg: any) => {
+            const role = msg.sender === 'user' ? 'User' : 'Ace';
+            return `${role}: ${msg.text}`;
+          })
+          .join('\n\n');
+      }
+    }
+
+    let answer = "";
+    
+    // Check if Gemini is configured
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+    if (geminiApiKey) {
+      try {
+        const prompt = `You are Ace, a professional, expert AI business intelligence analyst and customer support assistant for FabZClean dry cleaning and laundry franchise operations.
+Use the live database summary metrics, real-time monthly growth comparisons, specific matched entity context, and conversation history below to answer the user's question.
+
+Provide a rich, well-formatted, professional answer in markdown. You may use bullet points, bold text, and small markdown tables if appropriate to make the data easy to read.
+Do not use top-level headers (# or ##). Start from ### if you need headers. Keep your answer highly accurate, clear, and focused on the data.
+
+[Conversation History]
+${historyText || "No previous messages in this session."}
+
+[Live Database Summary (Last 365 Days)]
+${JSON.stringify(dbSummary, null, 2)}
+
+[Real-time Monthly Growth & Comparisons]
+${JSON.stringify(monthlyComparisons, null, 2)}
+
+[Matched Specific Entity Context (If customer/store/employee/order details matched from the query)]
+${JSON.stringify(entityContext, null, 2)}
+
+[User's Current Question]
+${q}
+
+Answer (as Ace):`;
+
+        const llmResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.3 },
+            }),
+          }
+        );
+
+        if (llmResponse.ok) {
+          const raw = await llmResponse.text();
+          const envelope = JSON.parse(raw);
+          const aiText = envelope?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || '').join('') || '';
+          if (aiText) {
+            answer = aiText.trim();
+          }
+        } else {
+          const rawErr = await llmResponse.text();
+          console.warn("Gemini call failed in Reports Q&A:", rawErr);
+        }
+      } catch (geminiError: any) {
+        console.warn("Gemini Reports Q&A error, falling back to heuristics:", geminiError.message || geminiError);
+      }
+    }
+
+    // Heuristic Fallback Engine
+    if (!answer) {
+      if (entityContext.matchedCustomersCount > 0) {
+        const custList = entityContext.matchedCustomers
+          .map((c: any) => `- **${c.name}** (Phone: ${c.phone || 'N/A'}, Credit: ₹${c.creditBalance}, Spent: ₹${Math.round(c.totalSpent).toLocaleString("en-IN")}, Orders: ${c.totalOrders})`)
+          .join('\n');
+        answer = `### 👤 Matched Customers (${entityContext.matchedCustomersCount})
+I found the following customer profiles in the database matching your search:
+
+${custList}
+
+*Click on any customer in the Customers tab to view full details.*`;
+      }
+      else if (entityContext.isCreditQuery && entityContext.customersWithDuesCount > 0) {
+        const dueList = entityContext.customersWithDues
+          .map((c: any) => `- **${c.name}** (Phone: ${c.phone || 'N/A'}) owes **₹${Math.round(c.creditBalance).toLocaleString("en-IN")}**`)
+          .join('\n');
+        answer = `### 👥 Outstanding Customer Credits
+There are **${entityContext.customersWithDuesCount}** customers with outstanding credit dues. Here are the top entries:
+
+${dueList}
+
+Total outstanding credit across the business is **₹${Math.round(dbSummary.summary.creditOutstanding).toLocaleString("en-IN")}**.`;
+      }
+      else if (entityContext.isStatusQuery && entityContext.filteredOrdersByStatusCount > 0) {
+        const ordList = entityContext.filteredOrdersByStatus
+          .map((o: any) => `- **${o.orderNumber}** for ${o.customerName} - ₹${o.totalAmount} (${o.storeCode}) - ${new Date(o.createdAt).toLocaleDateString('en-IN')}`)
+          .join('\n');
+        answer = `### 📦 Filtered Orders (${entityContext.statusLabel.toUpperCase()} - ${entityContext.filteredOrdersByStatusCount} total)
+Here are the most recent orders with status **${entityContext.statusLabel}**:
+
+${ordList}`;
+      }
+      else if (entityContext.matchedOrders.length > 0) {
+        const ordersList = entityContext.matchedOrders.map((details: any) => {
+          const dateStr = new Date(details.createdAt).toLocaleDateString('en-IN');
+          const dueStr = details.pickupDate ? new Date(details.pickupDate).toLocaleDateString('en-IN') : 'N/A';
+          const delivStr = details.deliveredAt ? new Date(details.deliveredAt).toLocaleDateString('en-IN') : null;
+          
+          return `### 📦 Order Details: ${details.orderNumber}
+- **Customer**: ${details.customerName} (${details.customerPhone || 'No Phone'})
+- **Store Location**: ${details.storeCode || 'N/A'}
+- **Status**: **${details.status.toUpperCase()}**
+- **Payment Status**: **${details.paymentStatus.toUpperCase()}**
+- **Order Date**: ${dateStr}
+- **Expected Due Date**: ${dueStr}
+${delivStr ? `- **Delivered On**: ${delivStr}\n` : ''}- **Total Amount**: ₹${details.totalAmount}
+- **Items**: ${details.items.join(', ') || 'None'}
+${details.specialInstructions ? `- **Special Instructions**: ${details.specialInstructions}\n` : ''}`;
+        }).join('\n\n---\n\n');
+        
+        answer = ordersList;
+      }
+      else if (entityContext.matchedStores.length > 0) {
+        const storeList = entityContext.matchedStores
+          .map((s: any) => `- **${s.name} (${s.code})**: ₹${Math.round(s.totalRevenue).toLocaleString("en-IN")} sales, ${s.totalOrders} orders, ${s.pendingOrders} pending backlog.`)
+          .join('\n');
+        answer = `### 🏪 Matched Store Analytics
+I found stats for the following store(s) matching your query:
+
+${storeList}`;
+      }
+      else if (entityContext.matchedEmployees.length > 0) {
+        const empList = entityContext.matchedEmployees
+          .map((e: any) => `- **${e.name}** (${e.role.replace(/_/g, ' ')}): Handled ${e.ordersHandled} orders, touched ₹${Math.round(e.revenueTouched).toLocaleString("en-IN")} revenue.`)
+          .join('\n');
+        answer = `### 👥 Matched Employee Output
+I found the following staff profiles matching your query:
+
+${empList}`;
+      }
+      else if (qLower.includes("revenue") || qLower.includes("sales") || qLower.includes("earn")) {
+        const storeBreakdown = dbSummary.franchisePerformance
+          .map(f => `- **${f.storeName}**: ₹${Math.round(f.totalRevenue).toLocaleString("en-IN")} (${f.totalOrders} orders)`)
+          .join("\n");
+        answer = `### 📊 Revenue Summary
+Total revenue for the past year is **₹${Math.round(dbSummary.summary.totalRevenue).toLocaleString("en-IN")}** across **${dbSummary.summary.totalOrders}** orders, with an average ticket value of **₹${Math.round(dbSummary.summary.averageOrderValue)}**.
+
+**Store Revenue Breakdown:**
+${storeBreakdown}
+
+*Note: Answers are calculated from live database entries.*`;
+      } 
+      else if (qLower.includes("profit") || qLower.includes("pnl") || qLower.includes("margin") || qLower.includes("expense")) {
+        const expenseBreakdown = Object.entries(dbSummary.pnl.expenseByCategory)
+          .map(([cat, amount]) => `- **${cat.replace(/_/g, ' ')}**: ₹${Math.round(amount).toLocaleString("en-IN")}`)
+          .join("\n");
+        answer = `### 💸 Profit & Loss (P&L) Overview
+Here is the financial summary for the business over the past 365 days:
+- **Total Revenue**: ₹${Math.round(dbSummary.pnl.revenue).toLocaleString("en-IN")}
+- **Total Expenses**: ₹${Math.round(dbSummary.pnl.totalExpenses).toLocaleString("en-IN")}
+- **Net Profit**: **₹${Math.round(dbSummary.pnl.netProfit).toLocaleString("en-IN")}**
+- **Net Profit Margin**: **${dbSummary.pnl.profitMargin.toFixed(1)}%**
+
+**Expense Breakdown:**
+${expenseBreakdown || "No expenses recorded."}`;
+      } 
+      else if (qLower.includes("service") || qLower.includes("sell") || qLower.includes("popular")) {
+        const servicesBreakdown = dbSummary.topServices.slice(0, 5)
+          .map(s => `- **${s.name}**: ${s.orderCount} orders (${s.itemCount} items) generating ₹${Math.round(s.revenue).toLocaleString("en-IN")}`)
+          .join("\n");
+        answer = `### 🧺 Top Services Performance
+The highest performing services based on orders and revenue are:
+
+${servicesBreakdown}
+
+The leading service overall is **${dbSummary.topServices[0]?.name || "N/A"}**.`;
+      } 
+      else if (qLower.includes("customer") || qLower.includes("credit") || qLower.includes("due")) {
+        const customerList = dbSummary.topCustomers.slice(0, 5)
+          .map(c => `- **${c.customerName}**: ${c.orders} orders, ₹${Math.round(c.revenue).toLocaleString("en-IN")} revenue (outstanding credit: ₹${Math.round(c.creditBalance)})`)
+          .join("\n");
+        answer = `### 👥 Customer Insights
+- **Active Customers**: ${dbSummary.summary.totalCustomers}
+- **Total Outstanding Credit**: **₹${Math.round(dbSummary.summary.creditOutstanding).toLocaleString("en-IN")}**
+- **Wallet Balance Held**: ₹${Math.round(dbSummary.summary.walletBalance).toLocaleString("en-IN")}
+
+**Top Customers by Value:**
+${customerList}`;
+      } 
+      else if (qLower.includes("store") || qLower.includes("franchise") || qLower.includes("location")) {
+        const storeList = dbSummary.franchisePerformance
+          .map(f => `- **${f.storeName} (${f.franchiseCode})**: ₹${Math.round(f.totalRevenue).toLocaleString("en-IN")} revenue, ${f.totalOrders} orders, ₹${Math.round(f.creditOutstanding)} credit outstanding. Top Service: ${f.topService}`)
+          .join("\n");
+        answer = `### 🏪 Store & Franchise Performance
+Performance summary for all configured locations:
+
+${storeList}`;
+      } 
+      else {
+        answer = `### 🤖 Ace Assistant Overview
+I can answer detailed business intelligence and support queries about your dry cleaning franchise using live database statistics. E.g., try asking about:
+- **Revenue & Sales**: "What is our store revenue breakdown?"
+- **Finance & P&L**: "What are our total expenses and profit margins?"
+- **Services**: "What is our best-selling service?"
+- **Customers**: "Who are our top customers and how much credit is outstanding?"
+- **Order Status**: "What is the status of order 0015?" (use any order number or last 4 digits)
+
+**Quick Summary of Live Metrics (Last 365 Days):**
+- **Total Revenue**: ₹${Math.round(dbSummary.summary.totalRevenue).toLocaleString("en-IN")}
+- **Total Orders**: ${dbSummary.summary.totalOrders} (AOV: ₹${Math.round(dbSummary.summary.averageOrderValue)})
+- **Completed Orders**: ${dbSummary.summary.completedOrders} (Completion Rate: ${dbSummary.summary.completionRate.toFixed(1)}%)
+- **Pending backlogs**: ${dbSummary.summary.pendingOrders} active orders.`;
+      }
+    }
+
+    await logReport(req, "reports_ask_ace", { question: q });
+    res.json({ success: true, answer });
+
+  } catch (error: any) {
+    console.error("Reports Ask Ace error:", error);
+    res.status(500).json({ success: false, message: "Failed to query Ask Ace", error: error.message });
+  }
+});
+
 export default router;

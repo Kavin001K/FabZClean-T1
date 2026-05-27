@@ -228,7 +228,7 @@ function OrdersComponent() {
     status: [],
     paymentStatus: [],
     search: '',
-    dateFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // Default to start of current month
+    dateFrom: undefined, // Default to All Time
     dateTo: undefined,
     dueDate: undefined,
     dueDatePreset: undefined,
@@ -259,11 +259,9 @@ function OrdersComponent() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['/api/orders', filters.dateFrom?.toISOString(), filters.dateTo?.toISOString()],
+    queryKey: ['/api/orders'],
     queryFn: () => ordersApi.getAll({ 
-      limit: 10000,
-      dateFrom: filters.dateFrom?.toISOString(),
-      dateTo: filters.dateTo?.toISOString()
+      limit: 10000
     }),
     staleTime: 30000,
     refetchOnWindowFocus: true,
@@ -1169,75 +1167,55 @@ function OrdersComponent() {
   }, []);
 
   // Calculate Quick Stats
+  // Calculate Quick Stats
   const stats = useMemo(() => {
-    const activeStatsOrders = filteredOrders.filter(o => 
-      o.status !== 'cancelled' && 
-      o.status !== 'refunded' && 
-      (o as any).status !== 'deleted'
-    );
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-    const totalOrders = activeStatsOrders.length;
-    const totalRevenue = totalOrders > 0
-      ? activeStatsOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0)
-      : 0;
-    const completedOrders = filteredOrders.filter(o => o.status === 'completed').length;
-    const pendingOrders = filteredOrders.filter(o => o.status === 'pending').length;
-    const processingOrders = filteredOrders.filter(o => o.status === 'processing').length;
+    // Helper to filter active orders (non-cancelled, non-refunded, non-deleted)
+    const filterActive = (orderList: any[]) => orderList.filter((o: any) => {
+      const status = String(o.status || '').toLowerCase();
+      return status !== 'cancelled' && status !== 'refunded' && status !== 'deleted';
+    });
+
+    const allActiveOrders = filterActive(orders);
+
+    // Filter active orders for this month
+    const thisMonthActiveOrders = allActiveOrders.filter(o => {
+      const d = new Date(o.createdAt || now);
+      return d >= startOfThisMonth && d <= now;
+    });
+
+    const totalOrders = thisMonthActiveOrders.length;
+    const totalRevenue = thisMonthActiveOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0);
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-    const now = new Date();
-    
-    // Growth calculation helper
-    const getGrowth = (current: number, period: 'month' | 'week' | 'day') => {
-      const getPeriodStats = (startDate: Date, endDate: Date) => {
-        const periodOrders = orders.filter(o => {
-          const d = new Date(o.createdAt || now);
-          const status = String(o.status || '').toLowerCase();
-          return d >= startDate && d < endDate && 
-                 status !== 'cancelled' && 
-                 status !== 'refunded' && 
-                 status !== 'deleted';
-        });
-        return {
-          count: periodOrders.length,
-          revenue: periodOrders.reduce((sum, o) => sum + safeParseFloat(o.totalAmount), 0)
-        };
-      };
+    // Filter all orders (including cancelled/refunded/deleted) for this month's completed/pending
+    const thisMonthOrders = orders.filter(o => {
+      const d = new Date(o.createdAt || now);
+      return d >= startOfThisMonth && d <= now;
+    });
+    const completedOrders = thisMonthOrders.filter(o => o.status === 'completed').length;
+    const pendingOrders = thisMonthOrders.filter(o => o.status === 'pending').length;
+    const processingOrders = thisMonthOrders.filter(o => o.status === 'processing').length;
 
-      if (period === 'month') {
-        const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    // Filter comparison period stats (last month)
+    const lastMonthActiveOrders = allActiveOrders.filter(o => {
+      const d = new Date(o.createdAt || now);
+      return d >= startOfLastMonth && d <= endOfLastMonth;
+    });
+    const lastMonthOrdersCount = lastMonthActiveOrders.length;
+    const lastMonthRevenue = lastMonthActiveOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0);
 
-        const thisMonthStats = getPeriodStats(startOfThisMonth, now);
-        const lastMonthStats = getPeriodStats(startOfLastMonth, endOfLastMonth);
-
-        return {
-          orders: lastMonthStats.count > 0 ? ((thisMonthStats.count - lastMonthStats.count) / lastMonthStats.count) * 100 : null,
-          revenue: lastMonthStats.revenue > 0 ? ((thisMonthStats.revenue - lastMonthStats.revenue) / lastMonthStats.revenue) * 100 : null,
-          label: "vs prev month"
-        };
-      } 
-      
-      // Fallback for other periods if needed (though current implementation only uses 'month')
-      let pastDate = new Date();
-      if (period === 'week') {
-        pastDate.setDate(now.getDate() - 7);
-      } else {
-        pastDate.setDate(now.getDate() - 1);
-      }
-      
-      const currentStats = getPeriodStats(pastDate, now);
-      const prevStats = getPeriodStats(new Date(pastDate.getTime() - (now.getTime() - pastDate.getTime())), pastDate);
-
-      return {
-        orders: prevStats.count > 0 ? ((currentStats.count - prevStats.count) / prevStats.count) * 100 : null,
-        revenue: prevStats.revenue > 0 ? ((currentStats.revenue - prevStats.revenue) / prevStats.revenue) * 100 : null,
-        label: period === 'week' ? "from last week" : "from yesterday"
-      };
+    const getGrowthPercentage = (currVal: number, prevVal: number) => {
+      if (prevVal > 0) return ((currVal - prevVal) / prevVal) * 100;
+      return currVal > 0 ? 100 : 0;
     };
 
-    const growth = getGrowth(totalOrders, 'month');
+    const ordersChange = getGrowthPercentage(totalOrders, lastMonthOrdersCount);
+    const revenueChange = getGrowthPercentage(totalRevenue, lastMonthRevenue);
 
     return {
       totalOrders,
@@ -1246,11 +1224,13 @@ function OrdersComponent() {
       pendingOrders,
       processingOrders,
       avgOrderValue,
-      ordersChange: growth?.orders ?? null,
-      revenueChange: growth?.revenue ?? null,
-      comparisonLabel: growth?.label ?? "No comparison data"
+      ordersChange,
+      revenueChange,
+      comparisonLabel: "prev month",
+      comparisonOrdersCount: lastMonthOrdersCount,
+      comparisonRevenue: lastMonthRevenue,
     };
-  }, [filteredOrders, orders]);
+  }, [orders]);
 
   // ... (inside component)
 
@@ -1590,6 +1570,19 @@ function OrdersComponent() {
               <Badge variant="outline" className={cn("text-[9px] font-bold h-5 px-1.5 py-0 border-primary/10", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
                 {(order as any).paymentStatus?.toUpperCase() || 'PENDING'}
               </Badge>
+              {['completed', 'delivered'].includes(order.status) ? (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/20 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle className="h-3 w-3" />
+                  <span>Deliv: {formatDate(new Date((order as any).deliveredAt || (order as any).updatedAt || new Date()).toString())}</span>
+                </div>
+              ) : (
+                (order as any).pickupDate && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/20 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                    <CalendarIcon className="h-3 w-3" />
+                    <span>Due: {formatDate(new Date((order as any).pickupDate).toString())}</span>
+                  </div>
+                )
+              )}
             </div>
           </div>
 
@@ -1698,8 +1691,22 @@ function OrdersComponent() {
           {formatCurrency(parseFloat(order.totalAmount || "0"))}
         </div>
         <div className="text-muted-foreground truncate">{formatDate((order.createdAt || new Date()).toString())}</div>
-        <div className="flex items-center font-medium">
-          {(order as any).pickupDate ? formatDate(new Date((order as any).pickupDate).toString()) : 'N/A'}
+        <div className="flex flex-col justify-center font-medium py-1">
+          {['completed', 'delivered'].includes(order.status) ? (
+            <>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider leading-none">Delivered</span>
+              <span className="text-emerald-700 dark:text-emerald-300 font-semibold mt-0.5">
+                {formatDate(new Date((order as any).deliveredAt || (order as any).updatedAt || new Date()).toString())}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider leading-none">Expected Due</span>
+              <span className="mt-0.5">
+                {(order as any).pickupDate ? formatDate(new Date((order as any).pickupDate).toString()) : 'N/A'}
+              </span>
+            </>
+          )}
         </div>
         <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
           <DropdownMenu>
@@ -1774,7 +1781,7 @@ function OrdersComponent() {
       <div>Payment</div>
       <div className="cursor-pointer hover:text-foreground justify-end flex items-center gap-1" onClick={() => handleSort('totalAmount')}>Amount <ArrowUpDown className="h-3 w-3" /></div>
       <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('createdAt')}>Date <ArrowUpDown className="h-3 w-3" /></div>
-      <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('pickupDate')}>Due Date <ArrowUpDown className="h-3 w-3" /></div>
+      <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('pickupDate')}>Due / Delivered <ArrowUpDown className="h-3 w-3" /></div>
       <div className="text-center">Actions</div>
     </div>
   );
@@ -1840,19 +1847,16 @@ function OrdersComponent() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Orders This Month</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{stats.totalOrders}</p>
-                  <div className={cn("flex items-center gap-1 mt-2 text-sm", (stats.ordersChange ?? 0) < 0 ? "text-red-500" : "text-green-600")}>
-                    {stats.ordersChange !== null && (
-                      <>
-                        {(stats.ordersChange ?? 0) < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                        <span className="hidden sm:inline">
-                          {`${(stats.ordersChange ?? 0) > 0 ? '+' : ''}${(stats.ordersChange ?? 0).toFixed(1)}% ${stats.comparisonLabel}`}
-                        </span>
-                        <span className="sm:hidden">
-                          {`${(stats.ordersChange ?? 0) > 0 ? '+' : ''}${(stats.ordersChange ?? 0).toFixed(1)}%`}
-                        </span>
-                      </>
-                    )}
-                    {stats.ordersChange === null && <span className="text-muted-foreground italic">No comparison data</span>}
+                  <div className="mt-2 flex min-h-5 items-center">
+                    <div className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all w-fit",
+                      (stats.ordersChange ?? 0) > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"
+                    )}>
+                      {(stats.ordersChange ?? 0) > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                      <span>
+                        {Math.abs(stats.ordersChange ?? 0).toFixed(1)}% vs {stats.comparisonOrdersCount} ({stats.comparisonLabel})
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1863,24 +1867,21 @@ function OrdersComponent() {
           </Card>
 
           <Card className="glass hover:shadow-lg transition-all duration-300 border-l-4 border-l-accent shadow-xl">
-            <CardContent className="pt-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Revenue This Month</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{formatCurrency(stats.totalRevenue)}</p>
-                  <div className={cn("flex items-center gap-1 mt-2 text-sm", (stats.revenueChange ?? 0) < 0 ? "text-red-500" : "text-green-600")}>
-                    {stats.revenueChange !== null && (
-                      <>
-                        {(stats.revenueChange ?? 0) < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                        <span className="hidden sm:inline">
-                          {`${(stats.revenueChange ?? 0) > 0 ? '+' : ''}${(stats.revenueChange ?? 0).toFixed(1)}% ${stats.comparisonLabel}`}
-                        </span>
-                        <span className="sm:hidden">
-                          {`${(stats.revenueChange ?? 0) > 0 ? '+' : ''}${(stats.revenueChange ?? 0).toFixed(1)}%`}
-                        </span>
-                      </>
-                    )}
-                    {stats.revenueChange === null && <span className="text-muted-foreground italic">No comparison data</span>}
+                  <div className="mt-2 flex min-h-5 items-center">
+                    <div className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all w-fit",
+                      (stats.revenueChange ?? 0) > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"
+                    )}>
+                      {(stats.revenueChange ?? 0) > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                      <span>
+                        {Math.abs(stats.revenueChange ?? 0).toFixed(1)}% vs {formatCurrency(stats.comparisonRevenue)} ({stats.comparisonLabel})
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-accent/10 flex items-center justify-center">
@@ -1891,7 +1892,7 @@ function OrdersComponent() {
           </Card>
 
           <Card className="glass hover:shadow-lg transition-all duration-300 border-l-4 border-l-blue-500 shadow-xl">
-            <CardContent className="pt-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg Order Value</p>
@@ -1909,7 +1910,7 @@ function OrdersComponent() {
           </Card>
 
           <Card className="glass hover:shadow-lg transition-all duration-300 border-l-4 border-l-green-500 shadow-xl">
-            <CardContent className="pt-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Completed</p>

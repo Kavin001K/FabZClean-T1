@@ -223,102 +223,120 @@ export default React.memo(function OrderDetailsDialog({
 
         <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-2">
           {/* Top Info Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Customer Column */}
-            <div className="space-y-6">
-              <div className="bg-white dark:bg-slate-900/60 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                    <User className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Customer Profile</p>
-                    <p className="font-black text-2xl tracking-tight text-slate-900 dark:text-white leading-tight">
-                      {order.customerName || anyOrder.customers?.name || "Guest Customer"}
-                    </p>
-                  </div>
+            <div className="bg-white dark:bg-slate-900/60 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                  <User className="h-6 w-6" />
                 </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Customer Profile</p>
+                  <p className="font-black text-2xl tracking-tight text-slate-900 dark:text-white leading-tight">
+                    {order.customerName || anyOrder.customers?.name || "Guest Customer"}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-3 flex-1">
+                {(anyOrder.customers?.phone || anyOrder.phone || anyOrder.customerPhone || order.customerPhone) && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                    <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                      <Phone className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm sm:text-base font-black text-slate-700 dark:text-slate-300">
+                      {anyOrder.customers?.phone || anyOrder.phone || anyOrder.customerPhone || order.customerPhone}
+                    </span>
+                  </div>
+                )}
                 
-                <div className="space-y-3">
-                  {(anyOrder.customers?.phone || anyOrder.phone || anyOrder.customerPhone || order.customerPhone) && (
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                        <Phone className="h-4 w-4" />
-                      </div>
-                      <span className="text-sm sm:text-base font-black text-slate-700 dark:text-slate-300">
-                        {anyOrder.customers?.phone || anyOrder.phone || anyOrder.customerPhone || order.customerPhone}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {(order.customerId || anyOrder.customers?.id) && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 w-fit">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">ID:</span>
-                      <span className="font-mono text-[10px] font-bold text-slate-700 dark:text-slate-300">
-                        {order.customerId || anyOrder.customers?.id}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                {(order.customerId || anyOrder.customers?.id) && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 w-fit">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">ID:</span>
+                    <span className="font-mono text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                      {order.customerId || anyOrder.customers?.id}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Priority</p>
-                <Badge className={getPriorityColor(anyOrder.priority || 'Normal')}>
-                  {anyOrder.priority || 'Normal'}
-                </Badge>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Store</p>
-                <Badge variant="outline" className="font-bold border-slate-300 bg-slate-900 text-white">
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Store</span>
+                <Badge variant="outline" className="font-black border-slate-900 bg-slate-900 text-white dark:bg-slate-800 dark:border-slate-700 text-[10px] uppercase tracking-widest px-3 py-1 rounded-lg">
                   {storeLabel}
                 </Badge>
               </div>
             </div>
 
             {/* Dates & Quick Stats Column */}
-              <div className="bg-white dark:bg-slate-900/60 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-12 w-12 rounded-2xl bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-inner">
-                      <Calendar className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Expected Delivery</p>
-                      <p className="font-black text-2xl tracking-tight text-slate-900 dark:text-white leading-tight">
-                        {anyOrder.pickupDate ? formatDate(anyOrder.pickupDate) : 'Not Scheduled'}
-                      </p>
-                    </div>
+            <div className="bg-white dark:bg-slate-900/60 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={cn(
+                    "h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner",
+                    ['completed', 'delivered'].includes(order.status)
+                      ? "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
+                      : "bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400"
+                  )}>
+                    {['completed', 'delivered'].includes(order.status)
+                      ? <CheckCircle className="h-6 w-6" />
+                      : <Calendar className="h-6 w-6" />
+                    }
                   </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {anyOrder.pickupDate && (
-                      <Badge className={cn(
-                        "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2",
-                        new Date(anyOrder.pickupDate) < new Date() && !['completed', 'delivered', 'cancelled'].includes(order.status)
-                          ? "bg-rose-50 text-rose-700 border-rose-200 shadow-sm shadow-rose-100"
-                          : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      )}>
-                        {new Date(anyOrder.pickupDate) < new Date() && !['completed', 'delivered', 'cancelled'].includes(order.status)
-                          ? "Overdue Alert"
-                          : "On Schedule"}
-                      </Badge>
-                    )}
-                    <Badge variant="outline" className="font-black border-slate-900 bg-slate-900 text-white dark:bg-slate-800 dark:border-slate-700 text-[10px] uppercase tracking-widest px-3 py-1 rounded-lg">
-                      {storeLabel}
-                    </Badge>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                      {['completed', 'delivered'].includes(order.status) ? 'Delivered On' : 'Expected Delivery'}
+                    </p>
+                    <p className="font-black text-2xl tracking-tight text-slate-900 dark:text-white leading-tight">
+                      {['completed', 'delivered'].includes(order.status)
+                        ? formatDate(anyOrder.deliveredAt || anyOrder.updatedAt || anyOrder.pickupDate)
+                        : anyOrder.pickupDate
+                          ? formatDate(anyOrder.pickupDate)
+                          : 'Not Scheduled'}
+                    </p>
                   </div>
                 </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority</span>
-                  <Badge className={cn("font-black tracking-widest uppercase text-[10px] px-3 py-1", getPriorityColor(anyOrder.priority || 'Normal'))}>
-                    {anyOrder.priority || 'Normal'}
+                
+                <div className="flex flex-wrap gap-2">
+                  {['completed', 'delivered'].includes(order.status) ? (
+                    <Badge className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2 bg-emerald-50 text-emerald-700 border-emerald-200">
+                      <CheckCircle className="h-3 w-3 mr-1.5" />
+                      Fulfilled
+                    </Badge>
+                  ) : anyOrder.pickupDate ? (
+                    <Badge className={cn(
+                      "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2",
+                      new Date(anyOrder.pickupDate) < new Date()
+                        ? "bg-rose-50 text-rose-700 border-rose-200 shadow-sm shadow-rose-100"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    )}>
+                      {new Date(anyOrder.pickupDate) < new Date()
+                        ? "Overdue Alert"
+                        : "On Schedule"}
+                    </Badge>
+                  ) : null}
+                  <Badge variant="outline" className="font-black border-slate-900 bg-slate-900 text-white dark:bg-slate-800 dark:border-slate-700 text-[10px] uppercase tracking-widest px-3 py-1 rounded-lg">
+                    {storeLabel}
                   </Badge>
                 </div>
+
+                {/* Show expected delivery as secondary info when order is delivered */}
+                {['completed', 'delivered'].includes(order.status) && anyOrder.pickupDate && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Expected by {formatDate(anyOrder.pickupDate)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority</span>
+                <Badge className={cn("font-black tracking-widest uppercase text-[10px] px-3 py-1", getPriorityColor(anyOrder.priority || 'Normal'))}>
+                  {anyOrder.priority || 'Normal'}
+                </Badge>
               </div>
             </div>
+          </div>
 
           {/* Items Section */}
           <div>

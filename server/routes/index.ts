@@ -141,6 +141,7 @@ export function registerAllRoutes(app: Express): void {
   initAnalyticsCron();
 
   // Algorithm and search API routes
+  app.use('/api/search', searchRouter);
   app.use('/api/v1/search', searchRouter);
   app.use('/api/v1/algorithms', algorithmsRouter);
   app.use('/api/v1/websocket', websocketMetricsRouter);

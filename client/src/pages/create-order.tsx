@@ -194,7 +194,6 @@ export default function CreateOrder() {
   const [newCustomerStreet, setNewCustomerStreet] = useState('');
   const [newCustomerCity, setNewCustomerCity] = useState('');
   const [newCustomerPincode, setNewCustomerPincode] = useState('');
-  const [newCustomerNotes, setNewCustomerNotes] = useState('');
 
   // Payment state
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | 'none'>('none');
@@ -600,7 +599,6 @@ export default function CreateOrder() {
         setNewCustomerStreet('');
         setNewCustomerCity('');
         setNewCustomerPincode('');
-        setNewCustomerNotes('');
       }
     },
     onError: (error) => {
@@ -2931,16 +2929,6 @@ export default function CreateOrder() {
                 type="email"
                 value={newCustomerEmail}
                 onChange={(e) => setNewCustomerEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="newCustomerNotes">Notes</Label>
-              <Textarea
-                id="newCustomerNotes"
-                placeholder="Additional notes (optional)"
-                value={newCustomerNotes}
-                onChange={(e) => setNewCustomerNotes(e.target.value)}
-                rows={2}
               />
             </div>
           </div>

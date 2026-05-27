@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase-auth';
 
 export interface SearchResult {
   id: string;
-  type: 'order' | 'customer' | 'product' | 'service';
+  type: 'order' | 'customer' | 'product' | 'service' | 'ai_insight';
   title: string;
   subtitle: string;
   description: string;
@@ -96,18 +96,75 @@ export function useGlobalSearch() {
         allResults = [...orders, ...customers, ...products, ...services];
 
       } else {
-        // Backend API Search
-        // Use apiClient.get if /api/search was supported by it, or direct fetch for custom endpoint
-        // Since apiClient adds /api prefix by default and supports auth headers:
-        const data = await apiClient.get(`/search?q=${encodeURIComponent(query)}&limit=10`);
+        // Backend API Search and AI Suggestion in parallel
+        const [searchResponse, aiResponse] = await Promise.allSettled([
+          apiClient.get(`/search?q=${encodeURIComponent(query)}&limit=10`),
+          apiClient.get(`/search/ai-suggest?q=${encodeURIComponent(query)}`)
+        ]);
+
+        let searchData: any = {};
+        if (searchResponse.status === 'fulfilled') {
+          const res = searchResponse.value;
+          searchData = res?.data || res || {};
+        }
 
         // Combine all results into a single array
-        allResults = [
-          ...(data.orders || []),
-          ...(data.customers || []),
-          ...(data.products || []),
-          ...(data.services || [])
-        ];
+        const rawOrders = Array.isArray(searchData.orders) 
+          ? searchData.orders 
+          : (searchData.orders?.data || []);
+        const rawCustomers = Array.isArray(searchData.customers) 
+          ? searchData.customers 
+          : (searchData.customers?.data || []);
+        const rawProducts = Array.isArray(searchData.products) 
+          ? searchData.products 
+          : (searchData.products?.data || []);
+        const rawServices = Array.isArray(searchData.services) 
+          ? searchData.services 
+          : (searchData.services?.data || []);
+
+        const mappedOrders = rawOrders.map((o: any) => ({
+          id: String(o.id || o.orderNumber || o.order_number),
+          type: 'order' as const,
+          title: o.orderNumber || o.order_number || String(o.id),
+          subtitle: o.customerName || o.customer_name || '',
+          description: `Status: ${o.status || 'unknown'}`,
+          url: `/orders/${o.id}`
+        }));
+
+        const mappedCustomers = rawCustomers.map((c: any) => ({
+          id: String(c.id),
+          type: 'customer' as const,
+          title: c.name,
+          subtitle: c.phone || c.email || '',
+          description: c.email || '',
+          url: `/customers/${c.id}`
+        }));
+
+        const mappedProducts = rawProducts.map((p: any) => ({
+          id: String(p.id),
+          type: 'product' as const,
+          title: p.name,
+          subtitle: p.sku || '',
+          description: p.category || '',
+          url: `/inventory/${p.id}`
+        }));
+
+        const mappedServices = rawServices.map((s: any) => ({
+          id: String(s.id),
+          type: 'service' as const,
+          title: s.name,
+          subtitle: s.category || '',
+          description: `Price: ${s.price}`,
+          url: `/services?highlight=${s.id}`
+        }));
+
+        allResults = [...mappedOrders, ...mappedCustomers, ...mappedProducts, ...mappedServices];
+
+        // Prepend AI Suggestion if fulfilled successfully
+        if (aiResponse.status === 'fulfilled' && aiResponse.value?.success && aiResponse.value?.data) {
+          const aiItem = aiResponse.value.data as SearchResult;
+          allResults.unshift(aiItem);
+        }
       }
 
       setSearchResults(allResults);

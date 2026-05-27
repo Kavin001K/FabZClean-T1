@@ -57,7 +57,12 @@ export class SupabaseStorage {
         const { data, error } = result;
         
         if (error) {
-            console.error(`[SupabaseStorage] customers ${operation} failed:`, error.message, error.details);
+            const isUniqueConflict = error.code === '23505' || String(error.message || '').includes('duplicate key');
+            if (isUniqueConflict) {
+                console.log(`[SupabaseStorage] customers ${operation} duplicate key conflict (handled gracefully): ${error.message}`);
+            } else {
+                console.error(`[SupabaseStorage] customers ${operation} failed:`, error.message, error.details);
+            }
             throw error;
         }
         
@@ -752,7 +757,10 @@ export class SupabaseStorage {
         try {
             customer = await this.writeCustomerRecord('update', snakeData, id);
         } catch (error: any) {
-            console.error('[SupabaseStorage] updateCustomer ERROR:', error?.message, error?.details);
+            const isUniqueConflict = error?.code === '23505' || String(error?.message || '').includes('duplicate key');
+            if (!isUniqueConflict) {
+                console.error('[SupabaseStorage] updateCustomer ERROR:', error?.message, error?.details);
+            }
             throw new Error(`Failed to update customer: ${error?.message || 'Unknown error'}`);
         }
         return this.mapDates(customer);
@@ -828,12 +836,15 @@ export class SupabaseStorage {
             const mappedSortBy = this.toSnakeCase({ [options.sortBy]: true });
             const sortField = Object.keys(mappedSortBy)[0] || options.sortBy;
             query = query.order(sortField, { ascending: isAscending });
+            if (sortField !== 'id') {
+                query = query.order('id', { ascending: false });
+            }
         } else {
             // Default sort by relevance, then newest
             if (search) {
                 query = query.order('id', { ascending: false });
             } else {
-                query = query.order('created_at', { ascending: false });
+                query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
             }
         }
 
@@ -1209,8 +1220,11 @@ export class SupabaseStorage {
             // Map camelCase to snake_case for Supabase
             const snakeSortBy = options.sortBy.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
             query = query.order(snakeSortBy, { ascending: options.sortOrder === 'asc' });
+            if (snakeSortBy !== 'id') {
+                query = query.order('id', { ascending: false });
+            }
         } else {
-            query = query.order('created_at', { ascending: false });
+            query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
         }
 
         if (options.limit) {

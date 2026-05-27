@@ -248,7 +248,7 @@ router.patch('/:id/status', adminLoginRequired, async (req, res) => {
 
     // Update order status based on delivery status
     if (status === 'delivered') {
-      await storage.updateOrder(delivery.orderId, { status: 'delivered' });
+      await storage.updateOrder(delivery.orderId, { status: 'delivered', deliveredAt: new Date() } as any);
     } else if (status === 'failed') {
       await storage.updateOrder(delivery.orderId, { status: 'cancelled' });
     }

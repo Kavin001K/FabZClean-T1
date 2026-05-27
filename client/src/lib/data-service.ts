@@ -294,7 +294,23 @@ async function fetchAllPaginated<T>(
     break;
   }
 
-  return allRows;
+  // Deduplicate results by ID if present to handle page shifts gracefully
+  const seen = new Set<string>();
+  const deduplicatedRows: T[] = [];
+  for (const row of allRows) {
+    const id = (row as any)?.id;
+    if (id !== undefined && id !== null) {
+      const stringId = String(id);
+      if (!seen.has(stringId)) {
+        seen.add(stringId);
+        deduplicatedRows.push(row);
+      }
+    } else {
+      deduplicatedRows.push(row);
+    }
+  }
+
+  return deduplicatedRows;
 }
 
 // Orders API

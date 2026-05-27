@@ -337,7 +337,7 @@ router.post('/:id/checkout', async (req, res) => {
     // Maintain backward behavior: auto-complete early-stage orders when fully paid.
     const earlyStatuses = ['pending', 'processing', 'confirmed'];
     if (paymentStatus === 'paid' && earlyStatuses.includes(updatedOrder.status)) {
-      updatedOrder = await storage.updateOrder(orderId, { status: 'completed' }) || updatedOrder;
+      updatedOrder = await storage.updateOrder(orderId, { status: 'completed', deliveredAt: new Date() } as any) || updatedOrder;
     }
     const serializedOrder = serializeOrder(updatedOrder);
 
@@ -590,7 +590,6 @@ router.get('/', async (req, res) => {
     console.log(`[GET /api/orders] Query: ${JSON.stringify(req.query)}`);
 
     const filters = {
-      limit,
       search,
       status: status === 'all' ? undefined : status,
       customerEmail,
@@ -1386,6 +1385,10 @@ router.patch(
 
       const updateData: any = { status };
       
+      if (status === 'completed' || status === 'delivered') {
+        updateData.deliveredAt = new Date();
+      }
+
       if (status === 'cancelled') {
         updateData.cancellationReason = cancellationReason || 'Operational Issue';
         updateData.cancelledAt = new Date();

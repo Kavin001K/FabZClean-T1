@@ -15,9 +15,10 @@ import {
     X,
     Clock,
     TrendingUp,
+    UserPlus,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
-import { ordersApi } from "@/lib/data-service";
+import { ordersApi, customersApi } from "@/lib/data-service";
 import DashboardDueToday from "./components/dashboard-due-today";
 import DashboardRecentOrders from "./components/dashboard-recent-orders";
 import DashboardQuickActions from "./components/dashboard-quick-actions";
@@ -45,11 +46,15 @@ export default function AdminDashboard() {
     // Date filter state
     const [filterMode, setFilterMode] = useState<FilterMode>('preset');
     const [presetPeriod, setPresetPeriod] = useState<PresetPeriod>('month');
+    const [isFilterActive, setIsFilterActive] = useState(false);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
     const [rangeStart, setRangeStart] = useState<Date | undefined>(undefined);
     const [rangeEnd, setRangeEnd] = useState<Date | undefined>(undefined);
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [rangeStep, setRangeStep] = useState<'start' | 'end'>('start');
+
+    const effectiveFilterMode = isFilterActive ? filterMode : 'preset';
+    const effectivePresetPeriod = isFilterActive ? presetPeriod : 'month';
 
     // Fetch all orders (single-tenant, no franchise filtering)
     const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
@@ -59,24 +64,32 @@ export default function AdminDashboard() {
         refetchInterval: 5000, // Background auto-sync 5s
     });
 
+    // Fetch all customers (single-tenant)
+    const { data: customersResponse, isLoading: isLoadingCustomers } = useQuery({
+        queryKey: ['admin-customers'],
+        queryFn: () => customersApi.getAll({ limit: 1000 }),
+        staleTime: 5000,
+    });
+    const customersList = useMemo(() => customersResponse?.data || [], [customersResponse]);
+
     // Filter orders by selected date/range
     const filteredOrders = useMemo(() => {
-        if (filterMode === 'all') return orders;
+        if (effectiveFilterMode === 'all') return orders;
 
         const now = new Date();
         const todayStart = startOfDay(now);
 
-        if (filterMode === 'preset') {
+        if (effectiveFilterMode === 'preset') {
             let start = todayStart;
-            if (presetPeriod === 'week') {
+            if (effectivePresetPeriod === 'week') {
                 start = startOfDay(subDays(now, 6));
-            } else if (presetPeriod === 'fortnight') {
+            } else if (effectivePresetPeriod === 'fortnight') {
                 start = startOfDay(subDays(now, 13));
-            } else if (presetPeriod === 'month') {
+            } else if (effectivePresetPeriod === 'month') {
                 start = startOfMonth(now);
-            } else if (presetPeriod === 'quarter') {
+            } else if (effectivePresetPeriod === 'quarter') {
                 start = startOfQuarter(now);
-            } else if (presetPeriod === 'year') {
+            } else if (effectivePresetPeriod === 'year') {
                 start = startOfYear(now);
             }
             return orders.filter((o: any) => {
@@ -85,14 +98,14 @@ export default function AdminDashboard() {
             });
         }
 
-        if (filterMode === 'date' && selectedDate) {
+        if (effectiveFilterMode === 'date' && selectedDate) {
             return orders.filter((o: any) => {
                 const d = new Date(o.createdAt || now);
                 return isSameDay(d, selectedDate);
             });
         }
 
-        if (filterMode === 'range' && rangeStart && rangeEnd) {
+        if (effectiveFilterMode === 'range' && rangeStart && rangeEnd) {
             const start = startOfDay(rangeStart);
             const end = endOfDay(rangeEnd);
             return orders.filter((o: any) => {
@@ -102,17 +115,16 @@ export default function AdminDashboard() {
         }
 
         return orders;
-    }, [orders, filterMode, presetPeriod, selectedDate, rangeStart, rangeEnd]);
+    }, [orders, effectiveFilterMode, effectivePresetPeriod, selectedDate, rangeStart, rangeEnd]);
 
-    // Calculate stats from filtered orders
+    // Calculate stats from calendar month, last 30 days, and same day last month
     const stats = useMemo(() => {
         const now = new Date();
-        const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const startOfThisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const startOfLastWeek = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const startOfThisMonth = startOfMonth(now);
+        const last30DaysStart = subDays(startOfThisMonth, 30);
+        const last30DaysEnd = startOfThisMonth;
+        const startOfToday = startOfDay(now);
+        const todayEnd = endOfDay(now);
 
         // Helper to filter active orders (non-cancelled, non-refunded, non-deleted)
         const filterActive = (orderList: any[]) => orderList.filter((o: any) => {
@@ -120,77 +132,162 @@ export default function AdminDashboard() {
             return status !== 'cancelled' && status !== 'refunded' && status !== 'deleted';
         });
 
-        // Use filtered orders for primary stats
-        const activeFilteredOrders = filterActive(filteredOrders);
-        const totalRevenue = activeFilteredOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
-        const totalOrders = activeFilteredOrders.length;
-        const activeCustomers = new Set(activeFilteredOrders.map((o: any) => o.customerId)).size;
-
-        // Growth calculations always use ALL orders but filtered for active status
         const allActiveOrders = filterActive(orders);
-        const thisMonthOrders = allActiveOrders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisMonth);
-        const lastMonthOrders = allActiveOrders.filter((o: any) => {
+
+        let start: Date | null = null;
+        let end: Date | null = null;
+        let compStart: Date | null = null;
+        let compEnd: Date | null = null;
+        let periodLabel = 'all-time';
+
+        if (effectiveFilterMode === 'preset') {
+            if (effectivePresetPeriod === 'day') {
+                start = startOfToday;
+                end = todayEnd;
+                compStart = startOfDay(subDays(now, 1));
+                compEnd = endOfDay(subDays(now, 1));
+                periodLabel = 'yesterday';
+            } else if (effectivePresetPeriod === 'week') {
+                start = startOfDay(subDays(now, 6));
+                end = todayEnd;
+                compStart = startOfDay(subDays(start, 7));
+                compEnd = endOfDay(subDays(start, 1));
+                periodLabel = 'prev week';
+            } else if (effectivePresetPeriod === 'fortnight') {
+                start = startOfDay(subDays(now, 13));
+                end = todayEnd;
+                compStart = startOfDay(subDays(start, 14));
+                compEnd = endOfDay(subDays(start, 1));
+                periodLabel = 'prev 14d';
+            } else if (effectivePresetPeriod === 'month') {
+                start = startOfThisMonth;
+                end = todayEnd;
+                compStart = last30DaysStart;
+                compEnd = last30DaysEnd;
+                periodLabel = 'prev 30d';
+            } else if (effectivePresetPeriod === 'quarter') {
+                start = startOfQuarter(now);
+                end = todayEnd;
+                compStart = subDays(start, 90);
+                compEnd = start;
+                periodLabel = 'prev 90d';
+            } else if (effectivePresetPeriod === 'year') {
+                start = startOfYear(now);
+                end = todayEnd;
+                compStart = subDays(start, 365);
+                compEnd = start;
+                periodLabel = 'prev year';
+            }
+        } else if (effectiveFilterMode === 'date' && selectedDate) {
+            start = startOfDay(selectedDate);
+            end = endOfDay(selectedDate);
+            compStart = startOfDay(subDays(selectedDate, 1));
+            compEnd = endOfDay(subDays(selectedDate, 1));
+            periodLabel = 'prev day';
+        } else if (effectiveFilterMode === 'range' && rangeStart && rangeEnd) {
+            start = startOfDay(rangeStart);
+            end = endOfDay(rangeEnd);
+            const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+            compStart = startOfDay(subDays(start, diffDays));
+            compEnd = endOfDay(subDays(start, 1));
+            periodLabel = `prev ${diffDays}d`;
+        }
+
+        // Filter orders inside the selected period
+        const periodOrders = allActiveOrders.filter((o: any) => {
+            if (!start || !end) return true; // All Time
             const d = new Date(o.createdAt || now);
-            return d >= startOfLastMonth && d < startOfThisMonth;
-        });
-        const thisWeekOrders = allActiveOrders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisWeek);
-        const lastWeekOrders = allActiveOrders.filter((o: any) => {
-            const d = new Date(o.createdAt || now);
-            return d >= startOfLastWeek && d < startOfThisWeek;
-        });
-        const todayOrders = allActiveOrders.filter((o: any) => new Date(o.createdAt || now) >= startOfToday);
-        const yesterdayOrders = allActiveOrders.filter((o: any) => {
-            const d = new Date(o.createdAt || now);
-            return d >= startOfYesterday && d < startOfToday;
+            return d >= start && d <= end;
         });
 
-        const getGrowth = (current: number, month: number, week: number, yesterday: number) => {
-            if (month > 0) return { val: ((current - month) / month) * 100, label: 'month' };
-            if (week > 0) return { val: ((current - week) / week) * 100, label: 'week' };
-            if (yesterday > 0) return { val: ((current - yesterday) / yesterday) * 100, label: 'yesterday' };
-            return { val: null, label: null };
+        const periodRevenue = periodOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const periodOrdersCount = periodOrders.length;
+        const periodActiveCustomers = new Set(periodOrders.map((o: any) => o.customerId)).size;
+
+        // Filter orders inside the comparison period
+        let comparisonOrdersCount = 0;
+        let comparisonRevenue = 0;
+        let comparisonActiveCustomers = 0;
+
+        if (compStart && compEnd) {
+            const comparisonOrders = allActiveOrders.filter((o: any) => {
+                const d = new Date(o.createdAt || now);
+                return d >= compStart && d <= compEnd;
+            });
+            comparisonRevenue = comparisonOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+            comparisonOrdersCount = comparisonOrders.length;
+            comparisonActiveCustomers = new Set(comparisonOrders.map((o: any) => o.customerId)).size;
+        }
+
+        // Helper to calculate growth percentage where division by zero is handled properly
+        const getGrowth = (current: number, previous: number) => {
+            if (previous > 0) return ((current - previous) / previous) * 100;
+            return current > 0 ? 100 : 0;
         };
 
-        // Revenue Growth (always from all orders)
-        const thisMonthRevenue = thisMonthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
-        const lastMonthRevenue = lastMonthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
-        const lastWeekRevenue = lastWeekOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const revenueGrowth = getGrowth(periodRevenue, comparisonRevenue);
+        const ordersGrowth = getGrowth(periodOrdersCount, comparisonOrdersCount);
+        const customersGrowth = getGrowth(periodActiveCustomers, comparisonActiveCustomers);
+
+        // 3. Today's Revenue and Orders (always current day)
+        const todayOrders = allActiveOrders.filter((o: any) => new Date(o.createdAt || now) >= startOfToday);
         const todayRevenue = todayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
-        const yesterdayRevenue = yesterdayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const todayOrderCount = todayOrders.length;
 
-        const revGrowth = filterMode === 'preset' && presetPeriod === 'month'
-            ? getGrowth(thisMonthRevenue, lastMonthRevenue, lastWeekRevenue, yesterdayRevenue)
-            : { val: null, label: null };
+        // 4. Last Month Same Day Revenue
+        const lastMonthSameDay = new Date(now);
+        lastMonthSameDay.setMonth(now.getMonth() - 1);
+        if (lastMonthSameDay.getDate() !== now.getDate()) {
+            lastMonthSameDay.setDate(0); // Go to last day of previous month
+        }
+        const lmsdStart = startOfDay(lastMonthSameDay);
+        const lmsdEnd = endOfDay(lastMonthSameDay);
+        const lastMonthSameDayOrders = allActiveOrders.filter((o: any) => {
+            const d = new Date(o.createdAt || now);
+            return d >= lmsdStart && d <= lmsdEnd;
+        });
+        const lastMonthSameDayRevenue = lastMonthSameDayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const todayRevenueGrowth = getGrowth(todayRevenue, lastMonthSameDayRevenue);
 
-        // Orders Growth
-        const ordGrowth = filterMode === 'preset' && presetPeriod === 'month'
-            ? getGrowth(thisMonthOrders.length, lastMonthOrders.length, lastWeekOrders.length, yesterdayOrders.length)
-            : { val: null, label: null };
+        // 5. New Customers (this period vs comparison period, fallback to current month vs last 30 days for All Time)
+        const custStart = start || startOfThisMonth;
+        const custEnd = end || todayEnd;
+        const custCompStart = compStart || last30DaysStart;
+        const custCompEnd = compEnd || last30DaysEnd;
+        const custLabel = periodLabel === 'all-time' ? '30 days' : periodLabel;
 
-        // Customers Growth
-        const activeThisMonth = new Set(thisMonthOrders.map((o: any) => o.customerId)).size;
-        const activeLastMonth = new Set(lastMonthOrders.map((o: any) => o.customerId)).size;
-        const activeLastWeek = new Set(lastWeekOrders.map((o: any) => o.customerId)).size;
-        const activeYesterday = new Set(yesterdayOrders.map((o: any) => o.customerId)).size;
+        const newCustomersThisPeriod = customersList.filter((c: any) => 
+            c.createdAt && new Date(c.createdAt) >= custStart && new Date(c.createdAt) <= custEnd
+        ).length;
 
-        const custGrowth = filterMode === 'preset' && presetPeriod === 'month'
-            ? getGrowth(activeThisMonth, activeLastMonth, activeLastWeek, activeYesterday)
-            : { val: null, label: null };
+        const newCustomersCompPeriod = customersList.filter((c: any) => 
+            c.createdAt && new Date(c.createdAt) >= custCompStart && new Date(c.createdAt) <= custCompEnd
+        ).length;
+
+        const newCustomersGrowth = getGrowth(newCustomersThisPeriod, newCustomersCompPeriod);
 
         return {
-            totalRevenue,
-            revenueGrowth: revGrowth.val !== null ? parseFloat(revGrowth.val.toFixed(1)) : null,
-            revenueLabel: revGrowth.label,
-            totalOrders,
-            ordersGrowth: ordGrowth.val !== null ? parseFloat(ordGrowth.val.toFixed(1)) : null,
-            ordersLabel: ordGrowth.label,
-            activeCustomers,
-            customersGrowth: custGrowth.val !== null ? parseFloat(custGrowth.val.toFixed(1)) : null,
-            customersLabel: custGrowth.label,
-            todayRevenue: todayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0),
-            todayOrderCount: todayOrders.length,
+            totalRevenue: periodRevenue,
+            revenueGrowth: effectiveFilterMode === 'all' ? null : parseFloat(revenueGrowth.toFixed(1)),
+            revenueLabel: periodLabel,
+            comparisonRevenue: comparisonRevenue,
+            totalOrders: periodOrdersCount,
+            ordersGrowth: effectiveFilterMode === 'all' ? null : parseFloat(ordersGrowth.toFixed(1)),
+            ordersLabel: periodLabel,
+            comparisonOrdersCount: comparisonOrdersCount,
+            activeCustomers: periodActiveCustomers,
+            customersGrowth: effectiveFilterMode === 'all' ? null : parseFloat(customersGrowth.toFixed(1)),
+            customersLabel: periodLabel,
+            newCustomers: newCustomersThisPeriod,
+            newCustomersGrowth: parseFloat(newCustomersGrowth.toFixed(1)),
+            newCustomersLabel: custLabel,
+            comparisonNewCustomers: newCustomersCompPeriod,
+            todayRevenue,
+            todayOrderCount,
+            todayRevenueGrowth: parseFloat(todayRevenueGrowth.toFixed(1)),
+            lastMonthSameDayRevenue,
         };
-    }, [orders, filteredOrders, filterMode]);
+    }, [orders, customersList, effectiveFilterMode, effectivePresetPeriod, selectedDate, rangeStart, rangeEnd]);
 
     const dueTodayOrders: any[] = useMemo(() => {
         return filteredOrders.map((order: any) => ({
@@ -252,11 +349,13 @@ export default function AdminDashboard() {
                 }
                 setRangeStep('start');
                 setCalendarOpen(false);
+                setIsFilterActive(true);
             }
         } else {
             setSelectedDate(date);
             setFilterMode('date');
             setCalendarOpen(false);
+            setIsFilterActive(true);
         }
     };
 
@@ -267,6 +366,7 @@ export default function AdminDashboard() {
         setRangeStart(undefined);
         setRangeEnd(undefined);
         setRangeStep('start');
+        setIsFilterActive(false);
     };
 
     const statCards = [
@@ -275,6 +375,7 @@ export default function AdminDashboard() {
             value: formatCurrency(stats.totalRevenue),
             growth: stats.revenueGrowth,
             label: stats.revenueLabel,
+            comparisonValue: formatCurrency(stats.comparisonRevenue),
             icon: IndianRupee,
         },
         {
@@ -282,14 +383,16 @@ export default function AdminDashboard() {
             value: String(stats.totalOrders),
             growth: stats.ordersGrowth,
             label: stats.ordersLabel,
+            comparisonValue: String(stats.comparisonOrdersCount),
             icon: ShoppingBag,
         },
         {
-            title: 'Customers',
-            value: String(stats.activeCustomers),
-            growth: stats.customersGrowth,
-            label: stats.customersLabel,
-            icon: Users,
+            title: 'New Customers',
+            value: String(stats.newCustomers),
+            growth: stats.newCustomersGrowth,
+            label: stats.newCustomersLabel,
+            comparisonValue: String(stats.comparisonNewCustomers),
+            icon: UserPlus,
         },
     ];
 
@@ -326,22 +429,30 @@ export default function AdminDashboard() {
             {/* Date Filter Bar */}
             <section className="flex flex-wrap items-center gap-3">
                 <Button
-                    variant={filterMode === 'all' ? 'pills' : 'outline'}
+                    variant={isFilterActive && filterMode === 'all' ? 'pills' : 'outline'}
                     size="sm"
                     className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
-                    onClick={clearFilter}
+                    onClick={() => {
+                        setFilterMode('all');
+                        setIsFilterActive(true);
+                        setSelectedDate(undefined);
+                        setRangeStart(undefined);
+                        setRangeEnd(undefined);
+                        setRangeStep('start');
+                    }}
                 >
                     All Time
                 </Button>
                 {PERIOD_FILTERS.map((period) => (
                     <Button
                         key={period.value}
-                        variant={filterMode === 'preset' && presetPeriod === period.value ? 'pills' : 'outline'}
+                        variant={isFilterActive && filterMode === 'preset' && presetPeriod === period.value ? 'pills' : 'outline'}
                         size="sm"
                         className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
                         onClick={() => {
                             setFilterMode('preset');
                             setPresetPeriod(period.value);
+                            setIsFilterActive(true);
                         }}
                     >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -353,7 +464,7 @@ export default function AdminDashboard() {
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                     <PopoverTrigger asChild>
                         <Button
-                            variant={filterMode === 'date' ? 'pills' : 'outline'}
+                            variant={isFilterActive && filterMode === 'date' ? 'pills' : 'outline'}
                             size="sm"
                             className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
                             onClick={() => {
@@ -362,7 +473,7 @@ export default function AdminDashboard() {
                             }}
                         >
                             <CalendarDays className="mr-2 h-4 w-4" />
-                            {filterMode === 'date' && selectedDate
+                            {isFilterActive && filterMode === 'date' && selectedDate
                                 ? format(selectedDate, 'dd MMM yyyy')
                                 : 'Select Date'}
                         </Button>
@@ -395,7 +506,7 @@ export default function AdminDashboard() {
 
                 {/* Date Range */}
                 <Button
-                    variant={filterMode === 'range' ? 'pills' : 'outline'}
+                    variant={isFilterActive && filterMode === 'range' ? 'pills' : 'outline'}
                     size="sm"
                     className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
                     onClick={() => {
@@ -407,13 +518,13 @@ export default function AdminDashboard() {
                     }}
                 >
                     <CalendarDays className="mr-2 h-4 w-4" />
-                    {filterMode === 'range' && rangeStart && rangeEnd
+                    {isFilterActive && filterMode === 'range' && rangeStart && rangeEnd
                         ? `${format(rangeStart, 'dd MMM')} — ${format(rangeEnd, 'dd MMM')}`
                         : 'Date Range'}
                 </Button>
 
                 {/* Active filter indicator */}
-                {filterMode !== 'all' && (
+                {isFilterActive && (
                     <Badge variant="secondary" className="rounded-full font-bold text-xs px-3 py-1 gap-1.5 bg-primary/10 text-primary border-primary/20">
                         {filterLabel}
                         <button onClick={clearFilter} className="ml-1 hover:bg-primary/20 rounded-full p-0.5">
@@ -424,7 +535,7 @@ export default function AdminDashboard() {
             </section>
 
             {/* Key Metrics */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
                 {statCards.map((card) => {
                     const Icon = card.icon;
                     return (
@@ -440,21 +551,19 @@ export default function AdminDashboard() {
                                 <div className="mt-3 flex min-h-5 items-center">
                                     {card.growth !== null ? (
                                         <div className={cn(
-                                            "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all",
+                                            "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all",
                                             card.growth > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"
                                         )}>
                                             {card.growth > 0 ? (
-                                                <ArrowUpRight className="h-3 w-3" />
+                                                <ArrowUpRight className="h-3.5 w-3.5" />
                                             ) : (
-                                                <ArrowDownRight className="h-3 w-3" />
+                                                <ArrowDownRight className="h-3.5 w-3.5" />
                                             )}
                                             {Math.abs(card.growth)}%
-                                            <span className="text-muted-foreground/60 font-medium ml-1">vs prev {card.label}</span>
+                                            <span className="text-muted-foreground/60 font-medium ml-1">vs {card.comparisonValue} ({card.label})</span>
                                         </div>
-                                    ) : (filterMode !== 'all' && filterMode !== 'preset') || (filterMode === 'preset' && presetPeriod !== 'month') ? (
-                                        <Badge variant="outline" className="text-[9px] h-5 border-border/50 font-bold uppercase tracking-tight text-muted-foreground/60">Filtered view</Badge>
                                     ) : (
-                                        <span className="text-[10px] text-muted-foreground/40 font-medium">Monthly baseline set</span>
+                                        <span className="text-xs text-muted-foreground/40 font-medium">{card.title === 'New Customers' ? 'Monthly registration baseline' : 'All-time baseline'}</span>
                                     )}
                                 </div>
                             </CardContent>
@@ -473,6 +582,22 @@ export default function AdminDashboard() {
                     <CardContent>
                         <div className="truncate text-3xl font-black text-emerald-800 dark:text-emerald-300 tabular-nums tracking-tight">
                             {formatCurrency(stats.todayRevenue)}
+                        </div>
+                        <div className="mt-3 flex min-h-5 items-center">
+                            <div className={cn(
+                                "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all",
+                                stats.todayRevenueGrowth > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"
+                            )}>
+                                {stats.todayRevenueGrowth > 0 ? (
+                                    <ArrowUpRight className="h-3.5 w-3.5" />
+                                ) : (
+                                    <ArrowDownRight className="h-3.5 w-3.5" />
+                                )}
+                                {Math.abs(stats.todayRevenueGrowth)}%
+                                <span className="text-muted-foreground/60 font-medium ml-1">
+                                    vs {formatCurrency(stats.lastMonthSameDayRevenue)} (last month same day)
+                                </span>
+                            </div>
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Calculator, Calendar, CreditCard, Settings, User, ShoppingCart, Package, Users, ShoppingBag, Truck, FileText, Loader2 } from 'lucide-react';
+import { Search, Calculator, Calendar, CreditCard, Settings, User, ShoppingCart, Package, Users, ShoppingBag, Truck, FileText, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGlobalSearch, SearchResult } from '@/hooks/use-global-search';
@@ -80,6 +80,7 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
       case 'customer': return <Users className="mr-2 h-4 w-4" />;
       case 'product': return <Package className="mr-2 h-4 w-4" />;
       case 'service': return <Settings className="mr-2 h-4 w-4" />;
+      case 'ai_insight': return <Sparkles className="mr-2 h-4 w-4 text-[#c2d44e] animate-pulse" />;
       default: return <Search className="mr-2 h-4 w-4" />;
     }
   };
@@ -144,23 +145,46 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
               {!isSearching && (
                 <>
                   {Object.entries(groupedResults).map(([type, results]) => (
-                    <CommandGroup key={type} heading={type.charAt(0).toUpperCase() + type.slice(1) + 's'}>
+                    <CommandGroup 
+                      key={type} 
+                      heading={type === 'ai_insight' ? 'AI Insights' : type.charAt(0).toUpperCase() + type.slice(1) + 's'}
+                    >
                       {results.map((result) => (
                         <CommandItem
                           key={result.id}
                           value={result.id} // value is used for key, but not filtering since shouldFilter=false
                           onSelect={() => handleSelect(result)}
-                          className="cursor-pointer"
+                          className={`cursor-pointer ${
+                            result.type === 'ai_insight' 
+                              ? 'border border-[#c2d44e]/10 bg-[#c2d44e]/5 hover:bg-[#c2d44e]/10 dark:border-[#c2d44e]/10 dark:bg-[#c2d44e]/5' 
+                              : ''
+                          }`}
                         >
                           {getIcon(result.type)}
                           <div className="flex flex-col flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium truncate">{result.title}</span>
-                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal capitalize">
-                                {result.type}
+                              <span className="font-semibold text-foreground truncate">{result.title}</span>
+                              <Badge 
+                                variant={result.type === 'ai_insight' ? 'outline' : 'secondary'} 
+                                className={`text-[10px] h-5 px-1.5 font-normal capitalize ${
+                                  result.type === 'ai_insight' 
+                                    ? 'bg-[#c2d44e]/20 text-[#d2e46b] border border-[#c2d44e]/30' 
+                                    : ''
+                                }`}
+                              >
+                                {result.type === 'ai_insight' ? 'AI Suggestion' : result.type}
                               </Badge>
                             </div>
-                            <span className="text-xs text-muted-foreground truncate">{result.subtitle} • {result.description}</span>
+                            {result.type === 'ai_insight' ? (
+                              <span className="text-xs text-foreground/90 whitespace-normal leading-relaxed mt-1">
+                                {result.subtitle} 
+                                <span className="text-muted-foreground font-light text-[10px] block mt-1">
+                                  {result.description}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground truncate">{result.subtitle} • {result.description}</span>
+                            )}
                           </div>
                         </CommandItem>
                       ))}

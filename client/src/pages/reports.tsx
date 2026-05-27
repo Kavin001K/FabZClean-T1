@@ -424,12 +424,105 @@ function DetailMetricContent({ metricKey, overview }: { metricKey: string; overv
   );
 }
 
+// Simple React-based Markdown parser for AI responses
+function parseMarkdownToReact(text: string) {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+
+  let inList = false;
+  let listItems: React.ReactNode[] = [];
+
+  const flushList = (key: number) => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={`list-${key}`} className="list-disc pl-5 my-2 space-y-1">
+          {listItems}
+        </ul>
+      );
+      listItems = [];
+    }
+    inList = false;
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    // Check for headers (e.g. ### Header)
+    if (trimmed.startsWith('###')) {
+      flushList(index);
+      const headerText = trimmed.replace(/^###\s*/, '');
+      elements.push(
+        <h3 key={`h3-${index}`} className="text-base font-bold text-foreground mt-4 mb-2">
+          {parseInlineFormatting(headerText)}
+        </h3>
+      );
+      return;
+    }
+    if (trimmed.startsWith('##')) {
+      flushList(index);
+      const headerText = trimmed.replace(/^##\s*/, '');
+      elements.push(
+        <h4 key={`h4-${index}`} className="text-sm font-bold text-foreground mt-3 mb-1.5 uppercase tracking-wider">
+          {parseInlineFormatting(headerText)}
+        </h4>
+      );
+      return;
+    }
+
+    // Check for list items (e.g. - Item or * Item)
+    if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
+      inList = true;
+      const itemText = trimmed.replace(/^[-*]\s*/, '');
+      listItems.push(
+        <li key={`li-${index}`} className="text-sm leading-relaxed">
+          {parseInlineFormatting(itemText)}
+        </li>
+      );
+      return;
+    }
+
+    // Empty line separates blocks
+    if (trimmed === '') {
+      flushList(index);
+      return;
+    }
+
+    // Standard paragraph line
+    flushList(index);
+    elements.push(
+      <p key={`p-${index}`} className="text-sm leading-relaxed mb-2 text-foreground/90">
+        {parseInlineFormatting(line)}
+      </p>
+    );
+  });
+
+  flushList(lines.length);
+  return <div className="space-y-1">{elements}</div>;
+}
+
+// Simple inline parser for bold **text** and italics *text*
+function parseInlineFormatting(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index} className="font-extrabold text-foreground">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return <em key={index} className="italic text-foreground/80">{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
+}
+
 export default function ReportsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [rangeDays, setRangeDays] = useState('30');
   const [detailTarget, setDetailTarget] = useState<DetailTarget | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [isExpenseSheetOpen, setIsExpenseSheetOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
@@ -438,6 +531,68 @@ export default function ReportsPage() {
     incurredAt: new Date().toISOString().slice(0, 10),
     storeCode: '',
   });
+
+  // Chat state for Ask Ace tab
+  const [messages, setMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([
+    { sender: 'ai', text: '### 🤖 Ask Ace Reports Assistant\nAsk me any question about your dry cleaning business performance! I can process orders, customer credits, store revenues, and expenses from the database. Try asking:\n- *What is our total revenue breakdown by store?*\n- *What is the status of order 0015?* (type the last 4 digits of any order number)\n- *Who is our top-value customer?*\n- *What was our profit margin?*\n\nYou can also ask follow-up questions, and I will remember the context of our conversation!' }
+  ]);
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiTriggeredUrl, setAiTriggeredUrl] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const handleAskAiQuestion = useCallback(async (questionText: string) => {
+    const trimmed = questionText.trim();
+    if (!trimmed) return;
+
+    // Add user message
+    setMessages(prev => [...prev, { sender: 'user', text: trimmed }]);
+    setAiQuery('');
+    setIsAiLoading(true);
+
+    try {
+      const response = await authorizedFetch('/reports/ask-ace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: trimmed, history: messages }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get answer from AI assistant');
+      }
+
+      const result = await response.json();
+      setMessages(prev => [...prev, { sender: 'ai', text: result.answer || 'No response returned.' }]);
+    } catch (err: any) {
+      toast({
+        title: 'AI Assistant Error',
+        description: err.message || 'Could not fetch answer. Please try again.',
+        variant: 'destructive',
+      });
+      setMessages(prev => [...prev, { sender: 'ai', text: '⚠️ *Sorry, I encountered an error while processing your request. Please check your network connection or try again.*' }]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  }, [toast]);
+
+  // Handle incoming link queries from Search Bar
+  useEffect(() => {
+    if (aiTriggeredUrl) return;
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const qParam = params.get('q');
+    
+    if (tabParam === 'ai' || tabParam === 'ace') {
+      setActiveTab('ai');
+      if (qParam) {
+        setAiTriggeredUrl(true);
+        // Automatically trigger AI question submission
+        void handleAskAiQuestion(qParam);
+        // Clear query parameters from URL so refreshing doesn't resubmit
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [aiTriggeredUrl, handleAskAiQuestion]);
 
   useEffect(() => {
     document.title = 'Reports | FabzClean';
@@ -815,7 +970,7 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex w-full overflow-x-auto no-scrollbar justify-start gap-2 rounded-2xl border border-border bg-muted/50 p-2">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="stores">Stores</TabsTrigger>
@@ -823,6 +978,10 @@ export default function ReportsPage() {
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="finance">Finance</TabsTrigger>
+          <TabsTrigger value="ai" className="gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-[#c2d44e] animate-pulse" />
+            Ask Ace
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-6 xl:grid-cols-[1.8fr_1fr]">
@@ -1195,6 +1354,115 @@ export default function ReportsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="ai" className="space-y-6">
+          <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+            <Card className="border-border bg-card flex flex-col h-[600px] overflow-hidden rounded-3xl">
+              <CardHeader className="border-b border-border flex flex-row items-center justify-between py-4">
+                <div>
+                  <CardTitle className="text-foreground flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-[#c2d44e] animate-pulse" />
+                    Ask Ace Business Analyst
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Ask questions about your sales, profits, store outputs, and customer credit.
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setMessages([{ sender: 'ai', text: '### 🤖 Ask Ace Reports Assistant\nAsk me any question about your dry cleaning business performance! I can process orders, customer credits, store revenues, and expenses from the database. Try asking:\n- *What is our total revenue breakdown by store?*\n- *What is the status of order 0015?* (type the last 4 digits of any order number)\n- *Who is our top-value customer?*\n- *What was our profit margin?*\n\nYou can also ask follow-up questions, and I will remember the context of our conversation!' }])}
+                  className="text-xs h-8 border-border bg-transparent text-muted-foreground hover:text-foreground"
+                >
+                  Clear Chat
+                </Button>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div 
+                      className={`max-w-[85%] rounded-3xl px-5 py-4 ${
+                        msg.sender === 'user' 
+                          ? 'bg-[#c2d44e] text-black rounded-tr-none' 
+                          : 'bg-muted/40 text-foreground border border-border rounded-tl-none shadow-sm'
+                      }`}
+                    >
+                      {msg.sender === 'user' ? (
+                        <p className="text-sm font-medium whitespace-pre-wrap">{msg.text}</p>
+                      ) : (
+                        parseMarkdownToReact(msg.text)
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {isAiLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted/40 border border-border rounded-3xl rounded-tl-none px-5 py-4 flex items-center gap-3 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin text-[#c2d44e]" />
+                      Analyzing business database...
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+              <div className="p-4 border-t border-border bg-muted/10">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!isAiLoading && aiQuery.trim()) {
+                      void handleAskAiQuestion(aiQuery);
+                    }
+                  }} 
+                  className="flex gap-2"
+                >
+                  <input
+                    type="text"
+                    value={aiQuery}
+                    onChange={(e) => setAiQuery(e.target.value)}
+                    placeholder="Ask Ace e.g., what was our profit margin?"
+                    disabled={isAiLoading}
+                    className="flex-1 h-12 rounded-2xl border border-border bg-muted/20 px-4 text-foreground text-sm outline-none placeholder:text-muted-foreground/50 focus:border-primary/50 disabled:opacity-50"
+                  />
+                  <Button 
+                    type="submit" 
+                    disabled={isAiLoading || !aiQuery.trim()}
+                    className="bg-[#c2d44e] text-black hover:bg-[#d5e77d] rounded-2xl h-12 px-6"
+                  >
+                    Send
+                  </Button>
+                </form>
+              </div>
+            </Card>
+ 
+            <Card className="border-border bg-card rounded-3xl h-[600px] overflow-y-auto">
+              <CardHeader>
+                <CardTitle className="text-foreground text-base">Quick Queries</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Select a common business question to ask Ace.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[
+                  "What is our store revenue breakdown?",
+                  "Which service has generated the most sales?",
+                  "Who is our top-value customer?",
+                  "What is our profit margin?",
+                  "How many orders are currently pending?",
+                  "How much outstanding credit is due?"
+                ].map((promptText, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={isAiLoading}
+                    onClick={() => void handleAskAiQuestion(promptText)}
+                    className="w-full text-left rounded-2xl border border-border bg-muted/20 hover:bg-muted/50 p-4 text-xs font-semibold text-foreground transition hover:border-[#c2d44e]/40 disabled:opacity-50"
+                  >
+                    {promptText}
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
