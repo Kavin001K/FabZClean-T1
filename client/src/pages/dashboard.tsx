@@ -3,18 +3,14 @@ import { useAuth } from "@/contexts/auth-context";
 import AdminDashboard from "@/components/dashboard/admin-dashboard";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Suspense, lazy } from "react";
-import { Loader2 } from "lucide-react";
+import { LoadingState } from "@/components/ui/loading-state";
+import { PageTransition } from "@/components/ui/page-transition";
 
-// Lazy load role-specific dashboards
+const DashboardLoader = () => <LoadingState label="Loading dashboard…" />;
+
 const StoreManagerDashboard = lazy(() => import("@/components/dashboard/store-manager-dashboard"));
 const FactoryManagerDashboard = lazy(() => import("@/components/dashboard/factory-manager-dashboard"));
 const StoreStaffDashboard = lazy(() => import("@/components/dashboard/store-staff-dashboard"));
-
-const DashboardLoader = () => (
-  <div className="flex items-center justify-center min-h-[400px]">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  </div>
-);
 
 export default function Dashboard() {
   const { employee } = useAuth();
@@ -55,7 +51,9 @@ export default function Dashboard() {
 
   return (
     <ErrorBoundary>
-      {renderDashboard()}
+      <PageTransition>
+        {renderDashboard()}
+      </PageTransition>
     </ErrorBoundary>
   );
 }

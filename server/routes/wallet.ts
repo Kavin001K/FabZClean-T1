@@ -9,6 +9,14 @@ import { db as storage } from '../db';
 import { jwtRequired, requireRole } from '../middleware/auth';
 import { createSuccessResponse, createErrorResponse } from '../services/serialization';
 import { AuthService } from '../auth-service';
+import {
+  idempotencyMiddleware,
+  normalizePaymentMethod,
+  getParseErrorMessage,
+  parseBody,
+  walletRechargeSchema,
+  walletRefundSchema,
+} from '../services/transaction-guard';
 
 const router = Router();
 
@@ -17,41 +25,31 @@ const WALLET_READ_ROLES = ['admin', 'store_manager', 'store_staff', 'factory_man
 
 router.use(jwtRequired);
 
-function normalizePaymentMethod(value: unknown): string {
-  const raw = String(value || 'CASH').trim().toUpperCase().replace(/\s+/g, '_');
-  const allowed = new Set([
-    'CASH', 'UPI', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'NET_BANKING', 'OTHER',
-    'WALLET_REFUND', 'WALLET_ADJUSTMENT',
-  ]);
-  return allowed.has(raw) ? raw : 'OTHER';
-}
-
 /**
  * POST /api/wallet/recharge
  * Top up a customer's wallet balance
  */
-router.post('/recharge', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
+router.post('/recharge', requireRole(WALLET_MANAGE_ROLES), idempotencyMiddleware('wallet:recharge'), async (req, res) => {
     try {
-        const { customerId, amount, paymentMethod, referenceNumber, notes } = req.body;
-
-        if (!customerId || !amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-            return res.status(400).json(createErrorResponse('Valid customerId and positive amount are required', 400));
+        const parsed = parseBody(walletRechargeSchema, req.body);
+        if (parsed.ok === false) {
+            return res.status(400).json(createErrorResponse(getParseErrorMessage(parsed), 400));
         }
 
-        const rechargeAmount = parseFloat(amount);
+        const { customerId, amount, paymentMethod, referenceNumber, notes } = parsed.data;
         const normalizedMethod = normalizePaymentMethod(paymentMethod);
         const recordedBy = req.employee?.id || null;
         const recordedByName = req.employee?.username || 'system';
 
         const result = await (storage as any).processWalletRecharge(
             customerId,
-            rechargeAmount,
+            amount,
             normalizedMethod,
             recordedBy,
             recordedByName,
             {
-                referenceNumber: referenceNumber ? String(referenceNumber).trim() : undefined,
-                notes: notes ? String(notes).trim() : undefined,
+                referenceNumber: referenceNumber || undefined,
+                notes: notes || undefined,
             }
         );
 
@@ -67,11 +65,12 @@ router.post('/recharge', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
                 'customer',
                 customerId,
                 {
-                    amount: rechargeAmount,
+                    amount,
                     paymentMethod: normalizedMethod,
                     referenceNumber: referenceNumber || null,
                     newBalance: result.newBalance,
                     transactionId: result.transactionId,
+                    correlationId: req.correlationId,
                 },
                 req.ip || req.connection.remoteAddress,
                 req.get('user-agent')
@@ -85,10 +84,10 @@ router.post('/recharge', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
             id: result.id,
             entryNo: result.entryNo,
             paymentMethod: result.paymentMethod || normalizedMethod,
-            amount: result.amount ?? rechargeAmount,
+            amount: result.amount ?? amount,
         }, 'Wallet recharged successfully'));
     } catch (error: any) {
-        console.error('Wallet recharge error:', error);
+        console.error(JSON.stringify({ level: 'error', event: 'wallet_recharge_failed', correlationId: req.correlationId, message: error.message }));
         res.status(500).json(createErrorResponse(`Failed to recharge wallet: ${error.message}`, 500));
     }
 });
@@ -97,15 +96,14 @@ router.post('/recharge', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
  * POST /api/wallet/refund
  * Refund a customer via Wallet, Cash, Bank Transfer, etc.
  */
-router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
+router.post('/refund', requireRole(WALLET_MANAGE_ROLES), idempotencyMiddleware('wallet:refund'), async (req, res) => {
     try {
-        const { customerId, amount, refundMethod, reason, notes, orderId } = req.body;
-
-        if (!customerId || !amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-            return res.status(400).json(createErrorResponse('Valid customerId and positive amount are required', 400));
+        const parsed = parseBody(walletRefundSchema, req.body);
+        if (parsed.ok === false) {
+            return res.status(400).json(createErrorResponse(getParseErrorMessage(parsed), 400));
         }
 
-        const refundAmount = parseFloat(amount);
+        const { customerId, amount, refundMethod, reason, notes, orderId } = parsed.data;
         const recordedBy = req.employee?.id || null;
         const recordedByName = req.employee?.username || 'system';
         const method = refundMethod?.toLowerCase() || 'cash';
@@ -113,7 +111,7 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
         if (method === 'wallet') {
             const result = await (storage as any).processWalletRecharge(
                 customerId,
-                refundAmount,
+                amount,
                 'WALLET_REFUND',
                 recordedBy,
                 recordedByName,
@@ -126,7 +124,7 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
 
             await (storage as any).processRefundOut(
                 customerId,
-                refundAmount,
+                amount,
                 'WALLET',
                 reason || 'Wallet Refund',
                 orderId
@@ -140,12 +138,13 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
                     'customer',
                     customerId,
                     {
-                        amount: refundAmount,
+                        amount,
                         paymentMethod: 'WALLET',
                         newBalance: result.newBalance,
                         reason,
                         notes,
                         orderId,
+                        correlationId: req.correlationId,
                     },
                     req.ip || req.connection.remoteAddress,
                     req.get('user-agent')
@@ -160,7 +159,7 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
 
             const result = await (storage as any).processRefundOut(
                 customerId,
-                refundAmount,
+                amount,
                 formattedMethod,
                 reason,
                 orderId
@@ -178,11 +177,12 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
                     'customer',
                     customerId,
                     {
-                        amount: refundAmount,
+                        amount,
                         paymentMethod: formattedMethod,
                         reason,
                         notes,
                         orderId,
+                        correlationId: req.correlationId,
                     },
                     req.ip || req.connection.remoteAddress,
                     req.get('user-agent')
@@ -192,7 +192,7 @@ router.post('/refund', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
             res.json(createSuccessResponse({}, 'External refund processed successfully'));
         }
     } catch (error: any) {
-        console.error('Wallet refund error:', error);
+        console.error(JSON.stringify({ level: 'error', event: 'wallet_refund_failed', correlationId: req.correlationId, message: error.message }));
         res.status(500).json(createErrorResponse(`Failed to process refund: ${error.message}`, 500));
     }
 });

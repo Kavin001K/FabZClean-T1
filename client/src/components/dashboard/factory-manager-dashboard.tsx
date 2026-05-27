@@ -44,8 +44,13 @@ export default function FactoryManagerDashboard() {
     });
     const employees = Array.isArray(employeesRes) ? employeesRes : (employeesRes as any)?.data || [];
 
+    type AnalyticsOverview = {
+        charts?: { orderStatusDistribution?: Array<{ status: string; count: number }> };
+        metrics?: { totalOrders?: number };
+    };
+
     // Fetch analytics for accurate counts
-    const { data: analyticsRes } = useQuery({
+    const { data: analyticsRes } = useQuery<AnalyticsOverview>({
         queryKey: ["/api/analytics/overview"],
     });
     

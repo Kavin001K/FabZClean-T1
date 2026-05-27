@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-05-27",
+  "baselineTotal": 18,
+  "resolvedProductionTotal": 0,
+  "resolvedDevOnlyRemaining": 4,
+  "notes": "Remaining 4 moderate findings are dev-only drizzle-kit/esbuild chain; production audit is clean.",
+  "findings": [
+    { "package": "axios", "severity": "high", "action": "direct bump to >=1.15.2", "owner": "runtime" },
+    { "package": "drizzle-orm", "severity": "high", "action": "direct bump to >=0.45.2", "owner": "runtime" },
+    { "package": "@xmldom/xmldom", "severity": "high", "action": "override to >=0.9.10", "owner": "transitive" },
+    { "package": "fast-xml-builder", "severity": "high", "action": "override via @aws-sdk bump", "owner": "transitive" },
+    { "package": "express", "severity": "moderate", "action": "direct bump (qs chain)", "owner": "runtime" },
+    { "package": "postcss", "severity": "moderate", "action": "direct bump to >=8.5.10", "owner": "build" },
+    { "package": "uuid", "severity": "moderate", "action": "direct bump to >=13.0.1", "owner": "runtime" },
+    { "package": "ws", "severity": "moderate", "action": "direct bump to >=8.20.1", "owner": "runtime" },
+    { "package": "drizzle-kit", "severity": "moderate", "action": "dev bump to latest compatible", "owner": "dev" },
+    { "package": "qs", "severity": "moderate", "action": "override >=6.15.2", "owner": "transitive" },
+    { "package": "body-parser", "severity": "moderate", "action": "resolved via express bump", "owner": "transitive" },
+    { "package": "follow-redirects", "severity": "moderate", "action": "override >=1.15.12", "owner": "transitive" },
+    { "package": "fast-xml-parser", "severity": "moderate", "action": "override >=5.7.0", "owner": "transitive" },
+    { "package": "@aws-sdk/xml-builder", "severity": "moderate", "action": "resolved via aws-sdk bump", "owner": "transitive" },
+    { "package": "dompurify", "severity": "moderate", "action": "override >=3.4.0", "owner": "transitive" },
+    { "package": "esbuild", "severity": "moderate", "action": "resolved via drizzle-kit bump", "owner": "dev" },
+    { "package": "@esbuild-kit/core-utils", "severity": "moderate", "action": "resolved via drizzle-kit bump", "owner": "dev" },
+    { "package": "@esbuild-kit/esm-loader", "severity": "moderate", "action": "resolved via drizzle-kit bump", "owner": "dev" }
+  ]
+}

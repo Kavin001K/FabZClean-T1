@@ -11,6 +11,8 @@ import { registerAllRoutes } from "./routes/index";
 import { db as storage } from "./db";
 import { realtimeServer } from "./websocket-server";
 import { performanceMiddleware, getPerformanceStats } from "./performance-optimizer";
+import { requestContextMiddleware } from "./middleware/request-context";
+import { sloTrackingMiddleware } from "./middleware/slo-tracker";
 import { connectToMongo } from "./mongo-db";
 import { LocalStorage } from "./services/local-storage";
 import path from 'path';
@@ -27,6 +29,10 @@ app.use(helmet({
 }));
 app.use(compression());
 
+// Request context + SLO tracking (before route handlers)
+app.use(requestContextMiddleware());
+app.use(sloTrackingMiddleware());
+
 // Performance monitoring middleware
 app.use(performanceMiddleware());
 
@@ -40,24 +46,9 @@ const uploadsPath = process.env.UPLOADS_DIR || path.join(process.cwd(), 'server'
 app.use('/uploads', express.static(uploadsPath));
 log(`📁 Serving static uploads from: ${uploadsPath}`);
 
-// Simple health check route
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    message: 'FabZClean Server is running!'
-  });
-});
+// Health routes are registered via registerAllRoutes -> /api/health
 
-// Simple test route
-app.get('/api/test', (req, res) => {
-  res.json({
-    message: 'Server is working!',
-    version: '1.0.0'
-  });
-});
-
-// Performance metrics endpoint
+// Performance metrics endpoint (legacy alias)
 app.get('/api/performance', (req, res) => {
   res.json(getPerformanceStats());
 });
@@ -129,6 +120,21 @@ app.get('/api/performance', (req, res) => {
       log(`📊 Access at: http://${process.env.STATIC_IP}:${port}`);
     }
     log(`📊 Health check: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api/health`);
-    log(`🧪 Test endpoint: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api/test`);
+    log(`📊 Readiness: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api/health/ready`);
   });
+
+  const gracefulShutdown = (signal: string) => {
+    log(JSON.stringify({ level: 'warn', event: 'shutdown_started', signal }));
+    server.close(() => {
+      log(JSON.stringify({ level: 'info', event: 'shutdown_complete', signal }));
+      process.exit(0);
+    });
+    setTimeout(() => {
+      log(JSON.stringify({ level: 'error', event: 'shutdown_forced', signal }));
+      process.exit(1);
+    }, 15000).unref();
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 })();

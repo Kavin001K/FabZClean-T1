@@ -1302,7 +1302,9 @@ router.patch(
       }
 
       const oldLimit = Number(customer.creditLimit || 1000);
-      const updatedCustomer = await storage.updateCustomer(customerId, { creditLimit: normalizedCreditLimit });
+      const updatedCustomer = await storage.updateCustomer(customerId, {
+        creditLimit: String(normalizedCreditLimit),
+      });
 
       // Notify real-time clients
       realtimeServer.broadcast({

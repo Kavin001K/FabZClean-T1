@@ -157,6 +157,17 @@ function deleteHeader(headers: HeadersMap, key: string): void {
   }
 }
 
+function getCorrelationId(): string {
+  if (typeof window === "undefined") return "";
+  const existing = sessionStorage.getItem("fab_correlation_id");
+  if (existing) return existing;
+  const generated = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `corr-${Date.now()}`;
+  sessionStorage.setItem("fab_correlation_id", generated);
+  return generated;
+}
+
 function withAuth(init: RequestInit = {}): RequestInit {
   const headers = normalizeHeaders(init.headers);
   const isFormDataBody = typeof FormData !== "undefined" && init.body instanceof FormData;
@@ -166,6 +177,10 @@ function withAuth(init: RequestInit = {}): RequestInit {
     deleteHeader(headers, "Content-Type");
   } else if (!hasHeader(headers, "Content-Type")) {
     headers["Content-Type"] = "application/json";
+  }
+
+  if (!hasHeader(headers, "X-Correlation-Id")) {
+    headers["X-Correlation-Id"] = getCorrelationId();
   }
 
   const token = getAccessToken();

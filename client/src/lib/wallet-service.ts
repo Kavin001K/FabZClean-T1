@@ -47,14 +47,30 @@ export function normalizePaymentMethod(value: string): WalletPaymentMethodId {
   return match?.id ?? 'OTHER';
 }
 
+function createIdempotencyKey(scope: string): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${scope}-${crypto.randomUUID()}`;
+  }
+  return `${scope}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function withIdempotency(scope: string, init: RequestInit = {}): RequestInit {
+  const headers = new Headers(init.headers || {});
+  if (!headers.has('Idempotency-Key')) {
+    headers.set('Idempotency-Key', createIdempotencyKey(scope));
+  }
+  return { ...init, headers };
+}
+
 export async function rechargeWallet(params: {
   customerId: string;
   amount: number;
   paymentMethod: string;
   referenceNumber?: string;
   notes?: string;
+  idempotencyKey?: string;
 }): Promise<WalletRechargeResult> {
-  const res = await authorizedFetch('/wallet/recharge', {
+  const res = await authorizedFetch('/wallet/recharge', withIdempotency('wallet-recharge', {
     method: 'POST',
     body: JSON.stringify({
       customerId: params.customerId,
@@ -63,7 +79,7 @@ export async function rechargeWallet(params: {
       referenceNumber: params.referenceNumber,
       notes: params.notes,
     }),
-  });
+  }));
   return parseApiResponse<WalletRechargeResult>(res, 'Failed to recharge wallet');
 }
 
@@ -75,10 +91,10 @@ export async function refundWallet(params: {
   notes?: string;
   orderId?: string;
 }) {
-  const res = await authorizedFetch('/wallet/refund', {
+  const res = await authorizedFetch('/wallet/refund', withIdempotency('wallet-refund', {
     method: 'POST',
     body: JSON.stringify(params),
-  });
+  }));
   return parseApiResponse<{ newBalance?: number }>(res, 'Failed to issue refund');
 }
 
@@ -89,7 +105,7 @@ export async function payCredit(params: {
   referenceNumber?: string;
   notes?: string;
 }) {
-  const res = await authorizedFetch(`/credits/${params.customerId}/payment`, {
+  const res = await authorizedFetch(`/credits/${params.customerId}/payment`, withIdempotency('credit-payment', {
     method: 'POST',
     body: JSON.stringify({
       amount: params.amount,
@@ -97,7 +113,7 @@ export async function payCredit(params: {
       referenceNumber: params.referenceNumber,
       notes: params.notes,
     }),
-  });
+  }));
   return parseApiResponse(res, 'Failed to record credit payment');
 }
 
@@ -108,10 +124,10 @@ export async function adjustBalance(params: {
   reason: string;
   notes?: string;
 }) {
-  const res = await authorizedFetch(`/credits/${params.customerId}/adjust`, {
+  const res = await authorizedFetch(`/credits/${params.customerId}/adjust`, withIdempotency('balance-adjust', {
     method: 'POST',
     body: JSON.stringify(params),
-  });
+  }));
   return parseApiResponse(res, 'Failed to adjust balance');
 }
 

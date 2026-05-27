@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins, Users, Banknote, Smartphone, CreditCard, Building, FileText, Printer } from "lucide-react";
 import { PageTransition } from "@/components/ui/page-transition";
+import { InlineLoading } from "@/components/ui/loading-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -569,8 +570,8 @@ export default function WalletManagementPage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
-                        Loading customers...
+                      <TableCell colSpan={6} className="py-8">
+                        <InlineLoading label="Loading customers…" />
                       </TableCell>
                     </TableRow>
                   ) : filteredRows.length === 0 ? (

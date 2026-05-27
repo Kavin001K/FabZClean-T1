@@ -57,18 +57,17 @@ export default function AdminDashboard() {
     const effectivePresetPeriod = isFilterActive ? presetPeriod : 'month';
 
     // Fetch all orders (single-tenant, no franchise filtering)
-    const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
+    const { data: orders = [], isLoading: isLoadingOrders, isError: ordersError, refetch: refetchOrders } = useQuery({
         queryKey: ['admin-orders'],
         queryFn: () => ordersApi.getAll(),
-        staleTime: 5000,
-        refetchInterval: 5000, // Background auto-sync 5s
+        staleTime: 10000,
+        refetchInterval: 15000,
     });
 
-    // Fetch all customers (single-tenant)
-    const { data: customersResponse, isLoading: isLoadingCustomers } = useQuery({
+    const { data: customersResponse, isLoading: isLoadingCustomers, isError: customersError } = useQuery({
         queryKey: ['admin-customers'],
         queryFn: () => customersApi.getAll({ limit: 1000 }),
-        staleTime: 5000,
+        staleTime: 10000,
     });
     const customersList = useMemo(() => customersResponse?.data || [], [customersResponse]);
 
@@ -398,6 +397,12 @@ export default function AdminDashboard() {
 
     return (
         <div className="container-desktop space-y-6 py-2 sm:space-y-8 sm:py-4">
+            {(ordersError || customersError) && (
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3">
+                    <span>Some dashboard data failed to load. Your local view may be stale.</span>
+                    <Button variant="outline" size="sm" onClick={() => refetchOrders()}>Retry</Button>
+                </div>
+            )}
             <section className="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-7">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div className="max-w-2xl">
@@ -412,7 +417,7 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-2 gap-3 text-sm sm:w-auto sm:grid-cols-3">
                         <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Live sync</p>
-                            <p className="mt-1 font-semibold text-foreground">Every 5s</p>
+                            <p className="mt-1 font-semibold text-foreground">Every 15s</p>
                         </div>
                         <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Orders</p>

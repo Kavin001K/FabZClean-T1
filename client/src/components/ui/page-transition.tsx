@@ -1,39 +1,51 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { ReactNode } from "react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 interface PageTransitionProps {
   children: ReactNode;
   className?: string;
 }
 
+const MOTION_EASE = [0.25, 0.1, 0.25, 1] as const;
+
 const pageVariants = {
   initial: {
     opacity: 0,
-    y: 20,
-    scale: 0.98,
+    y: 12,
   },
   enter: {
     opacity: 1,
     y: 0,
-    scale: 1,
     transition: {
-      duration: 0.4,
-      ease: [0.43, 0.13, 0.23, 0.96],
-      staggerChildren: 0.1,
+      duration: 0.28,
+      ease: MOTION_EASE,
     },
   },
   exit: {
     opacity: 0,
-    y: -20,
-    scale: 0.98,
+    y: -8,
     transition: {
-      duration: 0.3,
-      ease: [0.43, 0.13, 0.23, 0.96],
+      duration: 0.2,
+      ease: MOTION_EASE,
     },
   },
 };
 
-export function PageTransition({ children, className = "" }: PageTransitionProps) {
+
+function MotionShell({
+  children,
+  className,
+  reduced,
+}: {
+  children: ReactNode;
+  className?: string;
+  reduced: boolean;
+}) {
+  if (reduced) {
+    return <div className={className}>{children}</div>;
+  }
+
   return (
     <motion.div
       initial="initial"
@@ -41,18 +53,32 @@ export function PageTransition({ children, className = "" }: PageTransitionProps
       exit="exit"
       variants={pageVariants}
       className={className}
+      style={{ willChange: "opacity, transform" }}
     >
       {children}
     </motion.div>
   );
 }
 
+export function PageTransition({ children, className = "" }: PageTransitionProps) {
+  const reduced = useReducedMotion();
+  return (
+    <MotionShell className={className} reduced={reduced}>
+      {children}
+    </MotionShell>
+  );
+}
+
 export function FadeIn({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const reduced = useReducedMotion();
+  if (reduced) return <>{children}</>;
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: "easeOut" }}
+      transition={{ duration: 0.28, delay, ease: MOTION_EASE }}
+      style={{ willChange: "opacity, transform" }}
     >
       {children}
     </motion.div>
@@ -68,18 +94,22 @@ export function SlideIn({
   direction?: "left" | "right" | "up" | "down";
   delay?: number;
 }) {
+  const reduced = useReducedMotion();
+  if (reduced) return <>{children}</>;
+
   const directions = {
-    left: { x: -100, y: 0 },
-    right: { x: 100, y: 0 },
-    up: { x: 0, y: -100 },
-    down: { x: 0, y: 100 },
+    left: { x: -24, y: 0 },
+    right: { x: 24, y: 0 },
+    up: { x: 0, y: -24 },
+    down: { x: 0, y: 24 },
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, ...directions[direction] }}
       animate={{ opacity: 1, x: 0, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: "easeOut" }}
+      transition={{ duration: 0.28, delay, ease: MOTION_EASE }}
+      style={{ willChange: "opacity, transform" }}
     >
       {children}
     </motion.div>
@@ -87,11 +117,15 @@ export function SlideIn({
 }
 
 export function ScaleIn({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const reduced = useReducedMotion();
+  if (reduced) return <>{children}</>;
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.4, delay, ease: "easeOut" }}
+      transition={{ duration: 0.24, delay, ease: MOTION_EASE }}
+      style={{ willChange: "opacity, transform" }}
     >
       {children}
     </motion.div>
@@ -99,6 +133,9 @@ export function ScaleIn({ children, delay = 0 }: { children: ReactNode; delay?: 
 }
 
 export function StaggerChildren({ children }: { children: ReactNode }) {
+  const reduced = useReducedMotion();
+  if (reduced) return <>{children}</>;
+
   return (
     <motion.div
       initial="initial"
@@ -106,7 +143,7 @@ export function StaggerChildren({ children }: { children: ReactNode }) {
       variants={{
         animate: {
           transition: {
-            staggerChildren: 0.1,
+            staggerChildren: 0.06,
           },
         },
       }}
@@ -117,13 +154,17 @@ export function StaggerChildren({ children }: { children: ReactNode }) {
 }
 
 export function StaggerItem({ children }: { children: ReactNode }) {
+  const reduced = useReducedMotion();
+  if (reduced) return <>{children}</>;
+
   return (
     <motion.div
       variants={{
-        initial: { opacity: 0, y: 20 },
+        initial: { opacity: 0, y: 10 },
         animate: { opacity: 1, y: 0 },
       }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.24, ease: MOTION_EASE }}
+      style={{ willChange: "opacity, transform" }}
     >
       {children}
     </motion.div>

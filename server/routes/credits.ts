@@ -13,6 +13,14 @@ import { db as storage } from '../db';
 import { jwtRequired, requireRole } from '../middleware/auth';
 import { createSuccessResponse, createErrorResponse } from '../services/serialization';
 import { AuthService } from '../auth-service';
+import {
+  balanceAdjustSchema,
+  creditPaymentSchema,
+  idempotencyMiddleware,
+  normalizePaymentMethod,
+  getParseErrorMessage,
+  parseBody,
+} from '../services/transaction-guard';
 
 const router = Router();
 
@@ -145,19 +153,15 @@ router.post('/:customerId/add', requireRole(CREDIT_MANAGE_ROLES), async (req, re
  * POST /credits/:customerId/payment
  * Record a credit payment (customer settling their dues)
  */
-router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req, res) => {
+router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), idempotencyMiddleware('credits:payment'), async (req, res) => {
     try {
         const { customerId } = req.params;
-        const {
-            amount,
-            paymentMethod,
-            referenceNumber,
-            notes
-        } = req.body;
-
-        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-            return res.status(400).json(createErrorResponse('Valid amount is required', 400));
+        const parsed = parseBody(creditPaymentSchema, req.body);
+        if (parsed.ok === false) {
+            return res.status(400).json(createErrorResponse(getParseErrorMessage(parsed), 400));
         }
+
+        const { amount, paymentMethod, referenceNumber, notes } = parsed.data;
 
         const customer = await storage.getCustomer(customerId);
         if (!customer) {
@@ -165,19 +169,15 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
         }
 
         const currentBalance = parseFloat(customer.creditBalance || '0');
-        const paymentAmount = parseFloat(amount);
+        const normalizedMethod = normalizePaymentMethod(paymentMethod);
 
-        // Use negative amount to reduce credit balance
-        const description = `Payment received${paymentMethod ? ` via ${paymentMethod}` : ''}${referenceNumber ? ` (Ref: ${referenceNumber})` : ''}`;
-
-        // Process the repayment using the robust RPC
         const recordedBy = req.employee?.id || null;
         const recordedByName = req.employee?.username || 'system';
 
         const result = await (storage as any).processCreditRepayment(
             customerId,
-            paymentAmount, // Positive amount expected by RPC
-            paymentMethod || 'CASH',
+            amount,
+            normalizedMethod,
             recordedBy,
             recordedByName
         );
@@ -186,7 +186,6 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
             throw new Error(result.error);
         }
 
-        // Log the action
         if (req.employee) {
             await AuthService.logAction(
                 req.employee.employeeId,
@@ -195,11 +194,13 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
                 'customer',
                 customerId,
                 {
-                    amount: paymentAmount,
-                    paymentMethod,
+                    amount,
+                    paymentMethod: normalizedMethod,
                     referenceNumber,
+                    notes,
                     previousBalance: currentBalance,
-                    newBalance: currentBalance - paymentAmount
+                    newBalance: result.balanceAfter,
+                    correlationId: req.correlationId,
                 },
                 req.ip || req.connection.remoteAddress,
                 req.get('user-agent')
@@ -210,12 +211,12 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
             message: 'Payment recorded successfully',
             creditId: customerId,
             previousBalance: currentBalance,
-            amountPaid: paymentAmount,
+            amountPaid: amount,
             newBalance: result.balanceAfter,
             transaction: result
         }));
     } catch (error: any) {
-        console.error('Record payment error:', error);
+        console.error(JSON.stringify({ level: 'error', event: 'credit_payment_failed', correlationId: req.correlationId, message: error.message }));
         res.status(500).json(createErrorResponse(`Failed to record payment: ${error.message}`, 500));
     }
 });
@@ -224,23 +225,15 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
  * POST /credits/:customerId/adjust
  * Adjust credit balance (admin only - for corrections/disputes)
  */
-router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => {
+router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), idempotencyMiddleware('credits:adjust'), async (req, res) => {
     try {
         const { customerId } = req.params;
-        const {
-            amount, // Can be positive (add/increase) or negative (reduce/decrease)
-            target, // "outstanding" or "credit_limit"
-            reason,
-            notes
-        } = req.body;
-
-        if (amount === undefined || isNaN(parseFloat(amount))) {
-            return res.status(400).json(createErrorResponse('Valid amount is required', 400));
+        const parsed = parseBody(balanceAdjustSchema, req.body);
+        if (parsed.ok === false) {
+            return res.status(400).json(createErrorResponse(getParseErrorMessage(parsed), 400));
         }
 
-        if (!reason) {
-            return res.status(400).json(createErrorResponse('Reason is required for adjustments', 400));
-        }
+        const { amount, target, reason, notes } = parsed.data;
 
         const customer = await storage.getCustomer(customerId);
         if (!customer) {
@@ -249,7 +242,7 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
 
         const currentBalance = parseFloat(customer.creditBalance || '0');
         const currentLimit = parseFloat(customer.creditLimit || '1000');
-        const changeAmount = parseFloat(amount);
+        const changeAmount = amount;
         const isLimitAdjustment = target === 'credit_limit';
 
         let result;

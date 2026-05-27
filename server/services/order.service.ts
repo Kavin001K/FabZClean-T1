@@ -238,7 +238,7 @@ export class OrderService {
       // If status changed to or from cancelled/refunded, refresh customer stats
       if (
         (updateData.status && updateData.status !== order.status) &&
-        (updateData.status === 'cancelled' || updateData.status === 'refunded' || order.status === 'cancelled' || order.status === 'refunded')
+        (updateData.status === 'cancelled' || String(updateData.status) === 'refunded' || order.status === 'cancelled' || String(order.status) === 'refunded')
       ) {
         if (updatedOrder.customerId) {
           setImmediate(() => this.refreshCustomerStats(updatedOrder.customerId!));
@@ -399,9 +399,9 @@ export class OrderService {
       });
 
       // Valid orders for spending/count are non-cancelled, non-refunded
-      const validOrders = customerOrders.filter(o => 
-        o.status !== 'cancelled' && 
-        o.status !== 'refunded'
+      const validOrders = customerOrders.filter(o =>
+        o.status !== 'cancelled' &&
+        String(o.status) !== 'refunded'
       );
 
       const totalSpent = validOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0);

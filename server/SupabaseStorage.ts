@@ -750,7 +750,7 @@ export class SupabaseStorage {
         return this.mapDates(customer);
     }
 
-    async updateCustomer(id: string, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    async updateCustomer(id: string, data: Partial<InsertCustomer> & Record<string, unknown>): Promise<Customer | undefined> {
         const snakeData = this.toSnakeCase(data);
         console.log('[SupabaseStorage] updateCustomer:', id, snakeData);
         let customer;

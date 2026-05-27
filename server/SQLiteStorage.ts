@@ -1651,6 +1651,18 @@ export class SQLiteStorage implements IStorage {
     return this.listAllRecords<Order>("orders");
   }
 
+  async getDueDateOrders(dateStr: string): Promise<Order[]> {
+    const rows = this.db.prepare(`
+      SELECT * FROM orders
+      WHERE status NOT IN ('completed', 'delivered', 'cancelled')
+        AND (
+          date(dueDate) = date(?)
+          OR date(pickupDate) = date(?)
+        )
+    `).all(dateStr, dateStr) as Order[];
+    return rows;
+  }
+
   // Alias for compatibility with existing routes
   async getOrders(): Promise<Order[]> {
     return this.listOrders();
