@@ -25,7 +25,9 @@ const DEFAULT_WEATHER: WeatherResponse = {
   weather: [{ description: "clear sky" }],
 };
 const WEATHER_CACHE_PREFIX = "fabzclean_weather";
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const LOCATION_CACHE_KEY = "fabzclean_user_location";
+const WEATHER_CACHE_TTL_MS = 60 * 60 * 1000;
+const LOCATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function readWeatherCache(location: Coordinates): WeatherResponse | null {
   try {
@@ -37,10 +39,9 @@ function readWeatherCache(location: Coordinates): WeatherResponse | null {
 
     const parsed = JSON.parse(cached) as { timestamp?: number; data?: WeatherResponse };
     if (!parsed.timestamp || !parsed.data) return null;
-    if (Date.now() - parsed.timestamp >= CACHE_TTL_MS) return null;
+    if (Date.now() - parsed.timestamp >= WEATHER_CACHE_TTL_MS) return null;
     return parsed.data;
-  } catch (error) {
-    console.warn("Failed to read cached weather data:", error);
+  } catch {
     return null;
   }
 }
@@ -52,8 +53,49 @@ function writeWeatherCache(location: Coordinates, data: WeatherResponse) {
       `${WEATHER_CACHE_PREFIX}_${location.lat}_${location.lon}`,
       JSON.stringify({ timestamp: Date.now(), data }),
     );
-  } catch (error) {
-    console.warn("Failed to cache weather data:", error);
+  } catch {
+    // Ignore quota / private-mode storage failures.
+  }
+}
+
+function readCachedUserLocation(): Coordinates | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(LOCATION_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as { timestamp?: number; lat?: number; lon?: number };
+    if (
+      typeof parsed.timestamp !== "number" ||
+      typeof parsed.lat !== "number" ||
+      typeof parsed.lon !== "number"
+    ) {
+      return null;
+    }
+    if (Date.now() - parsed.timestamp >= LOCATION_CACHE_TTL_MS) return null;
+
+    return {
+      lat: Number(parsed.lat.toFixed(2)),
+      lon: Number(parsed.lon.toFixed(2)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUserLocation(location: Coordinates) {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LOCATION_CACHE_KEY,
+      JSON.stringify({
+        timestamp: Date.now(),
+        lat: location.lat,
+        lon: location.lon,
+      }),
+    );
+  } catch {
+    // Ignore quota / private-mode storage failures.
   }
 }
 
@@ -75,50 +117,92 @@ function normalizeWeatherResponse(data: unknown): WeatherResponse | null {
   };
 }
 
+type GeolocationPermissionState = "granted" | "denied" | "prompt" | "unsupported";
+
+async function getGeolocationPermissionState(): Promise<GeolocationPermissionState> {
+  if (typeof navigator === "undefined" || !navigator.permissions?.query) {
+    return "unsupported";
+  }
+
+  try {
+    const status = await navigator.permissions.query({ name: "geolocation" });
+    if (status.state === "granted" || status.state === "denied" || status.state === "prompt") {
+      return status.state;
+    }
+    return "unsupported";
+  } catch {
+    return "unsupported";
+  }
+}
+
+function requestCurrentPosition(): Promise<Coordinates> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: Number(position.coords.latitude.toFixed(2)),
+          lon: Number(position.coords.longitude.toFixed(2)),
+        });
+      },
+      reject,
+      {
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: LOCATION_CACHE_TTL_MS,
+      },
+    );
+  });
+}
+
+function getInitialLocation(): Coordinates {
+  return readCachedUserLocation() ?? DEFAULT_LOCATION;
+}
+
 export default function WeatherWidget() {
-  const [location, setLocation] = useState<Coordinates>(DEFAULT_LOCATION);
-  const [geoError, setGeoError] = useState<string | null>(null);
-  const [geoResolved, setGeoResolved] = useState(false);
+  const [location, setLocation] = useState<Coordinates>(getInitialLocation);
+  const [usingLiveLocation, setUsingLiveLocation] = useState(() => readCachedUserLocation() !== null);
 
   useEffect(() => {
     let isActive = true;
 
-    const finishWithFallback = (message: string) => {
+    const applyLocation = (coords: Coordinates, live: boolean) => {
       if (!isActive) return;
-      setGeoError(message);
-      setLocation(DEFAULT_LOCATION);
-      setGeoResolved(true);
+      setLocation(coords);
+      setUsingLiveLocation(live);
     };
 
-    if (typeof window === "undefined" || !("geolocation" in navigator)) {
-      finishWithFallback("Location unavailable. Showing default weather.");
-      return () => {
-        isActive = false;
-      };
-    }
+    const bootstrapLocation = async () => {
+      if (typeof window === "undefined" || !("geolocation" in navigator)) {
+        applyLocation(DEFAULT_LOCATION, false);
+        return;
+      }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (!isActive) return;
-        const lat = Number(position.coords.latitude.toFixed(2));
-        const lon = Number(position.coords.longitude.toFixed(2));
-        setLocation({ lat, lon });
-        setGeoError(null);
-        setGeoResolved(true);
-      },
-      (error) => {
-        console.warn("Geolocation unavailable, using fallback weather:", {
-          code: error.code,
-          message: error.message,
-        });
-        finishWithFallback("Live location unavailable. Showing default weather.");
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: 5000,
-        maximumAge: 10 * 60 * 1000,
-      },
-    );
+      const cached = readCachedUserLocation();
+      if (cached) {
+        applyLocation(cached, true);
+      } else {
+        applyLocation(DEFAULT_LOCATION, false);
+      }
+
+      const permission = await getGeolocationPermissionState();
+      // Never auto-prompt for location on dashboard load; only refresh when already granted.
+      if (permission !== "granted") {
+        return;
+      }
+
+      try {
+        const coords = await requestCurrentPosition();
+        writeCachedUserLocation(coords);
+        applyLocation(coords, true);
+      } catch {
+        // Expected on desktops without GPS / blocked CoreLocation — keep cached/default silently.
+        if (!cached) {
+          applyLocation(DEFAULT_LOCATION, false);
+        }
+      }
+    };
+
+    void bootstrapLocation();
 
     return () => {
       isActive = false;
@@ -129,10 +213,9 @@ export default function WeatherWidget() {
 
   const { data: weather, isLoading } = useQuery<WeatherResponse>({
     queryKey: ["weather", location.lat, location.lon],
-    enabled: geoResolved,
     initialData: cachedWeather ?? DEFAULT_WEATHER,
-    staleTime: CACHE_TTL_MS,
-    gcTime: CACHE_TTL_MS,
+    staleTime: WEATHER_CACHE_TTL_MS,
+    gcTime: WEATHER_CACHE_TTL_MS,
     retry: 0,
     queryFn: async ({ signal }) => {
       const cached = readWeatherCache(location);
@@ -162,7 +245,6 @@ export default function WeatherWidget() {
           throw error;
         }
 
-        console.warn("Unable to fetch live weather, using fallback:", error);
         return cachedWeather ?? DEFAULT_WEATHER;
       }
     },
@@ -189,6 +271,10 @@ export default function WeatherWidget() {
 
   const description = safeWeather.weather[0]?.description ?? DEFAULT_WEATHER.weather[0].description;
   const advice = getLaundryAdvice(description);
+  const locationSourceLabel = usingLiveLocation ? "Live location" : "Default location";
+  const footerMessage = usingLiveLocation
+    ? `Using live weather for ${safeWeather.name}. Ideal for quick garment drying decisions.`
+    : `Showing weather for ${DEFAULT_WEATHER.name}. Enable location permission in your browser to use local weather.`;
 
   return (
     <Card className="flex h-full min-h-[20rem] flex-col overflow-hidden border-border bg-card shadow-sm">
@@ -197,7 +283,7 @@ export default function WeatherWidget() {
         {advice.icon}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between gap-6">
-        {!geoResolved && isLoading ? (
+        {isLoading && !cachedWeather ? (
           <div className="flex flex-1 items-center py-1 text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             <span className="text-xs">Loading...</span>
@@ -230,13 +316,13 @@ export default function WeatherWidget() {
                 </div>
                 <div className="rounded-2xl border border-border/60 bg-muted/25 p-4">
                   <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">Source</p>
-                  <p className="mt-2 text-sm font-semibold text-foreground">{geoError ? 'Default location' : 'Live location'}</p>
+                  <p className="mt-2 text-sm font-semibold text-foreground">{locationSourceLabel}</p>
                 </div>
               </div>
             </div>
 
             <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-              {geoError ?? `Using live weather for ${safeWeather.name}. Ideal for quick garment drying decisions.`}
+              {footerMessage}
             </div>
           </>
         )}
