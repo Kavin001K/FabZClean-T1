@@ -826,98 +826,98 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 }}
               >
                 {/* ── TOP HALF: stamp + line-items side by side ── */}
-                <div style={{ display: 'flex', alignItems: 'center', minHeight: '164px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', minHeight: '132px' }}>
 
                   {/* LEFT — SVG rubber stamp */}
                   <div
                     style={{
-                      width: '186px',
+                      width: '148px',
                       flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'flex-start',
-                      padding: '8px 0 8px 4px',
+                      padding: '6px 0 6px 4px',
                       overflow: 'visible',
                     }}
                   >
                     {isExpressOrder ? (
                       /* ── EXPRESS PRIORITY SVG stamp ── */
                       <svg
-                        width="186"
-                        height="158"
-                        viewBox="0 0 186 158"
+                        width="148"
+                        height="122"
+                        viewBox="0 0 148 122"
                         style={{ overflow: 'visible', display: 'block', transform: 'rotate(-6deg)' }}
                       >
-                        {/* Outer circle — cream fill, solid border */}
-                        <circle cx="108" cy="79" r="72" fill="#fff8f4" stroke="#c2410c" strokeWidth="3.5"/>
-                        {/* Inner circle — thinner ring */}
-                        <circle cx="108" cy="79" r="63" fill="none" stroke="#c2410c" strokeWidth="1.8"/>
+                        {/* Outer circle — cream fill */}
+                        <circle cx="85" cy="61" r="57" fill="#fff8f4" stroke="#c2410c" strokeWidth="3"/>
+                        {/* Inner ring */}
+                        <circle cx="85" cy="61" r="50" fill="none" stroke="#c2410c" strokeWidth="1.5"/>
 
                         {/* EXPRESS */}
-                        <text x="108" y="28" textAnchor="middle"
-                          fontFamily="'Arial Black', 'Arial', sans-serif"
-                          fontSize="11" fontWeight="900" fill="#c2410c" letterSpacing="4">EXPRESS</text>
+                        <text x="85" y="20" textAnchor="middle"
+                          fontFamily="'Arial Black', Arial, sans-serif"
+                          fontSize="10" fontWeight="900" fill="#c2410c" letterSpacing="3">EXPRESS</text>
 
-                        {/* Top star row: rule ★ ★ ★ rule */}
-                        <line x1="48" y1="39" x2="70" y2="39" stroke="#c2410c" strokeWidth="1.5"/>
-                        <text x="108" y="43" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#c2410c" letterSpacing="6">★ ★ ★</text>
-                        <line x1="146" y1="39" x2="168" y2="39" stroke="#c2410c" strokeWidth="1.5"/>
+                        {/* Top stars: — ★ ★ ★ — */}
+                        <line x1="40" y1="29" x2="58" y2="29" stroke="#c2410c" strokeWidth="1.3"/>
+                        <text x="85" y="33" textAnchor="middle" fontFamily="Arial" fontSize="9" fill="#c2410c" letterSpacing="5">★ ★ ★</text>
+                        <line x1="112" y1="29" x2="130" y2="29" stroke="#c2410c" strokeWidth="1.3"/>
 
                         {/* Top band bar */}
-                        <rect x="-60" y="52" width="320" height="3" fill="#c2410c"/>
+                        <rect x="-60" y="40" width="290" height="2.5" fill="#c2410c"/>
 
-                        {/* PRIORITY — large, bleeds left outside circle */}
-                        <text x="108" y="101" textAnchor="middle"
-                          fontFamily="'Arial Black', 'Impact', 'Arial', sans-serif"
-                          fontSize="52" fontWeight="900" fill="#c2410c" letterSpacing="-1">PRIORITY</text>
+                        {/* PRIORITY — large, bleeds left */}
+                        <text x="85" y="76" textAnchor="middle"
+                          fontFamily="'Arial Black', Impact, Arial, sans-serif"
+                          fontSize="40" fontWeight="900" fill="#c2410c" letterSpacing="-0.5">PRIORITY</text>
 
                         {/* Bottom band bar */}
-                        <rect x="-60" y="107" width="320" height="3" fill="#c2410c"/>
+                        <rect x="-60" y="81" width="290" height="2.5" fill="#c2410c"/>
 
                         {/* SAFE & CLEAN */}
-                        <text x="108" y="124" textAnchor="middle"
-                          fontFamily="'Arial Black', 'Arial', sans-serif"
-                          fontSize="10" fontWeight="900" fill="#c2410c" letterSpacing="3">SAFE &amp; CLEAN</text>
+                        <text x="85" y="95" textAnchor="middle"
+                          fontFamily="'Arial Black', Arial, sans-serif"
+                          fontSize="9" fontWeight="900" fill="#c2410c" letterSpacing="2.5">SAFE &amp; CLEAN</text>
 
-                        {/* Bottom star row */}
-                        <line x1="48" y1="133" x2="70" y2="133" stroke="#c2410c" strokeWidth="1.5"/>
-                        <text x="108" y="137" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#c2410c" letterSpacing="6">★ ★ ★</text>
-                        <line x1="146" y1="133" x2="168" y2="133" stroke="#c2410c" strokeWidth="1.5"/>
+                        {/* Bottom stars */}
+                        <line x1="40" y1="103" x2="58" y2="103" stroke="#c2410c" strokeWidth="1.3"/>
+                        <text x="85" y="107" textAnchor="middle" fontFamily="Arial" fontSize="9" fill="#c2410c" letterSpacing="5">★ ★ ★</text>
+                        <line x1="112" y1="103" x2="130" y2="103" stroke="#c2410c" strokeWidth="1.3"/>
                       </svg>
                     ) : isEditedInvoice ? (
                       /* ── REVISED BILL SVG stamp ── */
                       <svg
-                        width="176"
-                        height="152"
-                        viewBox="0 0 176 152"
+                        width="138"
+                        height="116"
+                        viewBox="0 0 138 116"
                         style={{ overflow: 'visible', display: 'block', transform: 'rotate(-6deg)' }}
                       >
-                        <circle cx="100" cy="76" r="68" fill="#f9f7ff" stroke="#6d28d9" strokeWidth="3.5"/>
-                        <circle cx="100" cy="76" r="59" fill="none" stroke="#6d28d9" strokeWidth="1.8"/>
+                        <circle cx="78" cy="58" r="52" fill="#f9f7ff" stroke="#6d28d9" strokeWidth="3"/>
+                        <circle cx="78" cy="58" r="46" fill="none" stroke="#6d28d9" strokeWidth="1.5"/>
 
-                        <text x="100" y="27" textAnchor="middle"
+                        <text x="78" y="20" textAnchor="middle"
                           fontFamily="'Arial Black', Arial, sans-serif"
-                          fontSize="11" fontWeight="900" fill="#6d28d9" letterSpacing="4">REVISED</text>
+                          fontSize="10" fontWeight="900" fill="#6d28d9" letterSpacing="3">REVISED</text>
 
-                        <line x1="42" y1="37" x2="62" y2="37" stroke="#6d28d9" strokeWidth="1.5"/>
-                        <text x="100" y="41" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#6d28d9" letterSpacing="6">★ ★ ★</text>
-                        <line x1="138" y1="37" x2="158" y2="37" stroke="#6d28d9" strokeWidth="1.5"/>
+                        <line x1="36" y1="28" x2="54" y2="28" stroke="#6d28d9" strokeWidth="1.3"/>
+                        <text x="78" y="32" textAnchor="middle" fontFamily="Arial" fontSize="9" fill="#6d28d9" letterSpacing="5">★ ★ ★</text>
+                        <line x1="102" y1="28" x2="120" y2="28" stroke="#6d28d9" strokeWidth="1.3"/>
 
-                        <rect x="-40" y="50" width="280" height="3" fill="#6d28d9"/>
+                        <rect x="-40" y="38" width="260" height="2.5" fill="#6d28d9"/>
 
-                        <text x="100" y="93" textAnchor="middle"
+                        <text x="78" y="71" textAnchor="middle"
                           fontFamily="'Arial Black', Impact, Arial, sans-serif"
-                          fontSize="44" fontWeight="900" fill="#6d28d9" letterSpacing="-1">BILL</text>
+                          fontSize="36" fontWeight="900" fill="#6d28d9" letterSpacing="-0.5">BILL</text>
 
-                        <rect x="-40" y="98" width="280" height="3" fill="#6d28d9"/>
+                        <rect x="-40" y="76" width="260" height="2.5" fill="#6d28d9"/>
 
-                        <text x="100" y="116" textAnchor="middle"
+                        <text x="78" y="90" textAnchor="middle"
                           fontFamily="'Arial Black', Arial, sans-serif"
-                          fontSize="10" fontWeight="900" fill="#6d28d9" letterSpacing="2">FAB CLEAN</text>
+                          fontSize="9" fontWeight="900" fill="#6d28d9" letterSpacing="2">FAB CLEAN</text>
 
-                        <line x1="42" y1="126" x2="62" y2="126" stroke="#6d28d9" strokeWidth="1.5"/>
-                        <text x="100" y="130" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#6d28d9" letterSpacing="6">★ ★ ★</text>
-                        <line x1="138" y1="126" x2="158" y2="126" stroke="#6d28d9" strokeWidth="1.5"/>
+                        <line x1="36" y1="98" x2="54" y2="98" stroke="#6d28d9" strokeWidth="1.3"/>
+                        <text x="78" y="102" textAnchor="middle" fontFamily="Arial" fontSize="9" fill="#6d28d9" letterSpacing="5">★ ★ ★</text>
+                        <line x1="102" y1="98" x2="120" y2="98" stroke="#6d28d9" strokeWidth="1.3"/>
                       </svg>
                     ) : (
                       /* ── no stamp placeholder ── */
