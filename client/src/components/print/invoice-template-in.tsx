@@ -814,114 +814,180 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 </div>
               </div>
 
+              {/* ── TOTALS CARD — reference design ── */}
               <div
                 className="invoice-totals-card"
                 style={{
                   background: panel,
                   border: `1px solid ${line}`,
-                  borderRadius: '10px',
-                  padding: '12px 14px',
-                  position: 'relative',
+                  borderRadius: '14px',
                   overflow: 'hidden',
+                  position: 'relative',
                 }}
               >
-                {isExpressOrder && (
+                {/* ── TOP HALF: stamp + line-items side by side ── */}
+                <div style={{ display: 'flex', alignItems: 'stretch', minHeight: '130px' }}>
+
+                  {/* LEFT — circular stamp */}
                   <div
                     style={{
-                      position: 'absolute',
-                      left: '-15px',
-                      top: '2px',
-                      width: '106px',
-                      height: '106px',
-                      borderRadius: '50%',
-                      border: '2px dashed rgba(234,88,12,0.32)',
-                      boxShadow: 'inset 0 0 0 3px rgba(234,88,12,0.1)',
-                      background: 'rgba(234,88,12,0.03)',
+                      width: '152px',
+                      flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transform: 'rotate(-10deg)',
-                      opacity: 0.65,
-                      zIndex: 0,
+                      padding: '12px 8px 12px 12px',
                     }}
                   >
-                    <div style={{ textAlign: 'center', color: '#c2410c', lineHeight: 1.1 }}>
-                      <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.18em' }}>EXPRESS</div>
-                      <div style={{ fontSize: '18px', fontWeight: 900 }}>PRIORITY</div>
-                      <div style={{ fontSize: '9px', fontWeight: 800 }}>FAB CLEAN</div>
-                    </div>
+                    {isExpressOrder ? (
+                      /* ── EXPRESS PRIORITY stamp ── */
+                      <div
+                        style={{
+                          width: '128px',
+                          height: '128px',
+                          borderRadius: '50%',
+                          border: '3px solid #c2410c',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transform: 'rotate(-8deg)',
+                          color: '#c2410c',
+                          position: 'relative',
+                          boxShadow: 'inset 0 0 0 5px rgba(194,65,12,0.08)',
+                          gap: '1px',
+                        }}
+                      >
+                        <div style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '0.22em', textTransform: 'uppercase' }}>EXPRESS</div>
+                        <div style={{ fontSize: '8px', letterSpacing: '0.18em' }}>★ ★ ★</div>
+                        <div style={{ fontSize: '34px', fontWeight: 900, lineHeight: 1, letterSpacing: '-0.02em', textTransform: 'uppercase' }}>PRIORITY</div>
+                        <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase' }}>SAFE &amp; CLEAN</div>
+                        <div style={{ fontSize: '8px', letterSpacing: '0.18em' }}>★ ★ ★</div>
+                      </div>
+                    ) : isEditedInvoice ? (
+                      /* ── REVISED stamp for edited invoice ── */
+                      <div
+                        style={{
+                          width: '120px',
+                          height: '120px',
+                          borderRadius: '50%',
+                          border: '3px solid #6d28d9',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transform: 'rotate(-7deg)',
+                          color: '#6d28d9',
+                          boxShadow: 'inset 0 0 0 5px rgba(109,40,217,0.07)',
+                          gap: '2px',
+                        }}
+                      >
+                        <div style={{ fontSize: '9px', fontWeight: 900, letterSpacing: '0.22em' }}>REVISED</div>
+                        <div style={{ fontSize: '8px', letterSpacing: '0.14em' }}>★ ★ ★</div>
+                        <div style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1, textTransform: 'uppercase' }}>BILL</div>
+                        <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.12em' }}>FAB CLEAN</div>
+                        <div style={{ fontSize: '8px', letterSpacing: '0.14em' }}>★ ★ ★</div>
+                      </div>
+                    ) : (
+                      /* ── no stamp for standard invoices ── */
+                      <div style={{ width: '120px' }} />
+                    )}
                   </div>
-                )}
-                {isEditedInvoice && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: '-10px',
-                      top: isExpressOrder ? '80px' : '6px',
-                      padding: '8px 10px',
-                      borderRadius: '10px',
-                      background: 'rgba(109,40,217,0.03)',
-                      border: '1px dashed rgba(196,181,253,0.7)',
-                      color: '#6d28d9',
-                      transform: 'rotate(-5deg)',
-                      opacity: 0.75,
-                      zIndex: 0,
-                    }}
-                  >
-                    <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.16em' }}>EDITED</div>
-                    <div style={{ fontSize: '14px', fontWeight: 900, lineHeight: 1.1 }}>REVISED BILL</div>
-                  </div>
-                )}
 
-                <div style={{ display: 'grid', gap: '14px', position: 'relative', zIndex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span style={{ color: mutedInk }}>Subtotal</span>
-                    <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(serviceSubtotal)}</strong>
-                  </div>
-                  {deliveryTotal > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: mutedInk }}>Delivery Charges</span>
-                      <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(deliveryTotal)}</strong>
-                    </div>
-                  )}
-                  {expressTotal > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#c2410c' }}>
-                      <span style={{ fontWeight: 700 }}>Express Surcharge</span>
-                      <strong style={{ fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(expressTotal)}</strong>
-                    </div>
-                  )}
-                  {enableGST && (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                        <span style={{ color: mutedInk }}>CGST @ 9%</span>
-                        <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(cgstAmount)}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                        <span style={{ color: mutedInk }}>SGST @ 9%</span>
-                        <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(sgstAmount)}</strong>
-                      </div>
-                    </>
-                  )}
-                  <div style={{ height: '3px', background: accent, borderRadius: '999px', marginTop: '4px' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 900, color: headingInk, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Grand Total</span>
-                    <span style={{ fontSize: '26px', fontWeight: 900, color: accent, fontFamily: '"IBM Plex Mono", monospace', whiteSpace: 'nowrap' }}>
-                      {formatIndianCurrency(grandTotal)}
-                    </span>
-                  </div>
+                  {/* RIGHT — line-items column */}
                   <div
                     style={{
-                      background: panelSoft,
-                      borderRadius: '8px',
-                      padding: '8px 10px',
-                      fontSize: '10px',
-                      color: mutedInk,
-                      textAlign: 'center',
-                      fontStyle: 'italic',
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      padding: '14px 16px 14px 8px',
                     }}
                   >
-                    {convertToWords(grandTotal)}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: mutedInk }}>Subtotal</span>
+                      <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(serviceSubtotal)}</strong>
+                    </div>
+                    {deliveryTotal > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: mutedInk }}>Delivery Charges</span>
+                        <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(deliveryTotal)}</strong>
+                      </div>
+                    )}
+                    {expressTotal > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#c2410c' }}>
+                        <span style={{ fontWeight: 700 }}>Express Surcharge</span>
+                        <strong style={{ fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(expressTotal)}</strong>
+                      </div>
+                    )}
+                    {enableGST && (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: mutedInk }}>CGST @ 9%</span>
+                          <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(cgstAmount)}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: mutedInk }}>SGST @ 9%</span>
+                          <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(sgstAmount)}</strong>
+                        </div>
+                      </>
+                    )}
                   </div>
+                </div>
+
+                {/* ── RED DIVIDER ── */}
+                <div style={{ height: '3px', background: isExpressOrder ? '#c2410c' : accent, margin: '0' }} />
+
+                {/* ── GRAND TOTAL ROW ── */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '14px 16px',
+                    gap: '8px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '20px',
+                      fontWeight: 900,
+                      color: headingInk,
+                      textTransform: 'uppercase',
+                      lineHeight: 1.15,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    GRAND<br />TOTAL
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '36px',
+                      fontWeight: 900,
+                      color: isExpressOrder ? '#c2410c' : accent,
+                      fontFamily: '"IBM Plex Mono", monospace',
+                      lineHeight: 1,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {formatIndianCurrency(grandTotal)}
+                  </span>
+                </div>
+
+                {/* ── WORDS BANNER ── */}
+                <div
+                  style={{
+                    background: panelSoft,
+                    borderTop: `1px solid ${line}`,
+                    padding: '8px 16px',
+                    fontSize: '10px',
+                    color: mutedInk,
+                    textAlign: 'center',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {convertToWords(grandTotal)}
                 </div>
               </div>
             </section>
