@@ -826,71 +826,102 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 }}
               >
                 {/* ── TOP HALF: stamp + line-items side by side ── */}
-                <div style={{ display: 'flex', alignItems: 'stretch', minHeight: '130px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', minHeight: '164px' }}>
 
-                  {/* LEFT — circular stamp */}
+                  {/* LEFT — SVG rubber stamp */}
                   <div
                     style={{
-                      width: '152px',
+                      width: '186px',
                       flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '12px 8px 12px 12px',
+                      justifyContent: 'flex-start',
+                      padding: '8px 0 8px 4px',
+                      overflow: 'visible',
                     }}
                   >
                     {isExpressOrder ? (
-                      /* ── EXPRESS PRIORITY stamp ── */
-                      <div
-                        style={{
-                          width: '128px',
-                          height: '128px',
-                          borderRadius: '50%',
-                          border: '3px solid #c2410c',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transform: 'rotate(-8deg)',
-                          color: '#c2410c',
-                          position: 'relative',
-                          boxShadow: 'inset 0 0 0 5px rgba(194,65,12,0.08)',
-                          gap: '1px',
-                        }}
+                      /* ── EXPRESS PRIORITY SVG stamp ── */
+                      <svg
+                        width="186"
+                        height="158"
+                        viewBox="0 0 186 158"
+                        style={{ overflow: 'visible', display: 'block', transform: 'rotate(-6deg)' }}
                       >
-                        <div style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '0.22em', textTransform: 'uppercase' }}>EXPRESS</div>
-                        <div style={{ fontSize: '8px', letterSpacing: '0.18em' }}>★ ★ ★</div>
-                        <div style={{ fontSize: '34px', fontWeight: 900, lineHeight: 1, letterSpacing: '-0.02em', textTransform: 'uppercase' }}>PRIORITY</div>
-                        <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase' }}>SAFE &amp; CLEAN</div>
-                        <div style={{ fontSize: '8px', letterSpacing: '0.18em' }}>★ ★ ★</div>
-                      </div>
+                        {/* Outer circle — cream fill, solid border */}
+                        <circle cx="108" cy="79" r="72" fill="#fff8f4" stroke="#c2410c" strokeWidth="3.5"/>
+                        {/* Inner circle — thinner ring */}
+                        <circle cx="108" cy="79" r="63" fill="none" stroke="#c2410c" strokeWidth="1.8"/>
+
+                        {/* EXPRESS */}
+                        <text x="108" y="28" textAnchor="middle"
+                          fontFamily="'Arial Black', 'Arial', sans-serif"
+                          fontSize="11" fontWeight="900" fill="#c2410c" letterSpacing="4">EXPRESS</text>
+
+                        {/* Top star row: rule ★ ★ ★ rule */}
+                        <line x1="48" y1="39" x2="70" y2="39" stroke="#c2410c" strokeWidth="1.5"/>
+                        <text x="108" y="43" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#c2410c" letterSpacing="6">★ ★ ★</text>
+                        <line x1="146" y1="39" x2="168" y2="39" stroke="#c2410c" strokeWidth="1.5"/>
+
+                        {/* Top band bar */}
+                        <rect x="-60" y="52" width="320" height="3" fill="#c2410c"/>
+
+                        {/* PRIORITY — large, bleeds left outside circle */}
+                        <text x="108" y="101" textAnchor="middle"
+                          fontFamily="'Arial Black', 'Impact', 'Arial', sans-serif"
+                          fontSize="52" fontWeight="900" fill="#c2410c" letterSpacing="-1">PRIORITY</text>
+
+                        {/* Bottom band bar */}
+                        <rect x="-60" y="107" width="320" height="3" fill="#c2410c"/>
+
+                        {/* SAFE & CLEAN */}
+                        <text x="108" y="124" textAnchor="middle"
+                          fontFamily="'Arial Black', 'Arial', sans-serif"
+                          fontSize="10" fontWeight="900" fill="#c2410c" letterSpacing="3">SAFE &amp; CLEAN</text>
+
+                        {/* Bottom star row */}
+                        <line x1="48" y1="133" x2="70" y2="133" stroke="#c2410c" strokeWidth="1.5"/>
+                        <text x="108" y="137" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#c2410c" letterSpacing="6">★ ★ ★</text>
+                        <line x1="146" y1="133" x2="168" y2="133" stroke="#c2410c" strokeWidth="1.5"/>
+                      </svg>
                     ) : isEditedInvoice ? (
-                      /* ── REVISED stamp for edited invoice ── */
-                      <div
-                        style={{
-                          width: '120px',
-                          height: '120px',
-                          borderRadius: '50%',
-                          border: '3px solid #6d28d9',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transform: 'rotate(-7deg)',
-                          color: '#6d28d9',
-                          boxShadow: 'inset 0 0 0 5px rgba(109,40,217,0.07)',
-                          gap: '2px',
-                        }}
+                      /* ── REVISED BILL SVG stamp ── */
+                      <svg
+                        width="176"
+                        height="152"
+                        viewBox="0 0 176 152"
+                        style={{ overflow: 'visible', display: 'block', transform: 'rotate(-6deg)' }}
                       >
-                        <div style={{ fontSize: '9px', fontWeight: 900, letterSpacing: '0.22em' }}>REVISED</div>
-                        <div style={{ fontSize: '8px', letterSpacing: '0.14em' }}>★ ★ ★</div>
-                        <div style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1, textTransform: 'uppercase' }}>BILL</div>
-                        <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.12em' }}>FAB CLEAN</div>
-                        <div style={{ fontSize: '8px', letterSpacing: '0.14em' }}>★ ★ ★</div>
-                      </div>
+                        <circle cx="100" cy="76" r="68" fill="#f9f7ff" stroke="#6d28d9" strokeWidth="3.5"/>
+                        <circle cx="100" cy="76" r="59" fill="none" stroke="#6d28d9" strokeWidth="1.8"/>
+
+                        <text x="100" y="27" textAnchor="middle"
+                          fontFamily="'Arial Black', Arial, sans-serif"
+                          fontSize="11" fontWeight="900" fill="#6d28d9" letterSpacing="4">REVISED</text>
+
+                        <line x1="42" y1="37" x2="62" y2="37" stroke="#6d28d9" strokeWidth="1.5"/>
+                        <text x="100" y="41" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#6d28d9" letterSpacing="6">★ ★ ★</text>
+                        <line x1="138" y1="37" x2="158" y2="37" stroke="#6d28d9" strokeWidth="1.5"/>
+
+                        <rect x="-40" y="50" width="280" height="3" fill="#6d28d9"/>
+
+                        <text x="100" y="93" textAnchor="middle"
+                          fontFamily="'Arial Black', Impact, Arial, sans-serif"
+                          fontSize="44" fontWeight="900" fill="#6d28d9" letterSpacing="-1">BILL</text>
+
+                        <rect x="-40" y="98" width="280" height="3" fill="#6d28d9"/>
+
+                        <text x="100" y="116" textAnchor="middle"
+                          fontFamily="'Arial Black', Arial, sans-serif"
+                          fontSize="10" fontWeight="900" fill="#6d28d9" letterSpacing="2">FAB CLEAN</text>
+
+                        <line x1="42" y1="126" x2="62" y2="126" stroke="#6d28d9" strokeWidth="1.5"/>
+                        <text x="100" y="130" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#6d28d9" letterSpacing="6">★ ★ ★</text>
+                        <line x1="138" y1="126" x2="158" y2="126" stroke="#6d28d9" strokeWidth="1.5"/>
+                      </svg>
                     ) : (
-                      /* ── no stamp for standard invoices ── */
-                      <div style={{ width: '120px' }} />
+                      /* ── no stamp placeholder ── */
+                      <div style={{ width: '8px' }} />
                     )}
                   </div>
 
