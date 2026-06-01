@@ -820,33 +820,35 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   background: panel,
                   border: `1px solid ${line}`,
                   borderRadius: '10px',
-                  padding: '10px 12px',
+                  padding: '12px 14px',
                   position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
                 {isExpressOrder && (
                   <div
                     style={{
                       position: 'absolute',
-                      left: '10px',
-                      top: '12px',
-                      width: '92px',
-                      height: '92px',
+                      left: '-15px',
+                      top: '2px',
+                      width: '106px',
+                      height: '106px',
                       borderRadius: '50%',
-                      border: '2px solid rgba(234,88,12,0.38)',
-                      boxShadow: 'inset 0 0 0 3px rgba(234,88,12,0.12)',
+                      border: '2px dashed rgba(234,88,12,0.32)',
+                      boxShadow: 'inset 0 0 0 3px rgba(234,88,12,0.1)',
+                      background: 'rgba(234,88,12,0.03)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transform: 'rotate(-12deg)',
-                      opacity: 0.72,
+                      transform: 'rotate(-10deg)',
+                      opacity: 0.65,
                       zIndex: 0,
                     }}
                   >
                     <div style={{ textAlign: 'center', color: '#c2410c', lineHeight: 1.1 }}>
-                      <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.18em' }}>EXPRESS</div>
-                      <div style={{ fontSize: '16px', fontWeight: 900 }}>PRIORITY</div>
-                      <div style={{ fontSize: '8px', fontWeight: 800 }}>FAB CLEAN</div>
+                      <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.18em' }}>EXPRESS</div>
+                      <div style={{ fontSize: '18px', fontWeight: 900 }}>PRIORITY</div>
+                      <div style={{ fontSize: '9px', fontWeight: 800 }}>FAB CLEAN</div>
                     </div>
                   </div>
                 )}
@@ -854,16 +856,16 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   <div
                     style={{
                       position: 'absolute',
-                      left: '12px',
-                      top: isExpressOrder ? '75px' : '12px',
+                      left: '-10px',
+                      top: isExpressOrder ? '80px' : '6px',
                       padding: '8px 10px',
                       borderRadius: '10px',
-                      background: '#f5f3ff',
-                      border: '1px solid #c4b5fd',
+                      background: 'rgba(109,40,217,0.03)',
+                      border: '1px dashed rgba(196,181,253,0.7)',
                       color: '#6d28d9',
                       transform: 'rotate(-5deg)',
-                      opacity: 0.85,
-                      zIndex: 2,
+                      opacity: 0.75,
+                      zIndex: 0,
                     }}
                   >
                     <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.16em' }}>EDITED</div>
@@ -871,7 +873,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gap: '10px', position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'grid', gap: '14px', position: 'relative', zIndex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                     <span style={{ color: mutedInk }}>Subtotal</span>
                     <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(serviceSubtotal)}</strong>
