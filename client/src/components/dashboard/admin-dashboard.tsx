@@ -43,19 +43,6 @@ const PERIOD_FILTERS: Array<{ value: PresetPeriod; label: string }> = [
 ];
 
 export default function AdminDashboard() {
-    // Date filter state
-    const [filterMode, setFilterMode] = useState<FilterMode>('preset');
-    const [presetPeriod, setPresetPeriod] = useState<PresetPeriod>('month');
-    const [isFilterActive, setIsFilterActive] = useState(false);
-    const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-    const [rangeStart, setRangeStart] = useState<Date | undefined>(undefined);
-    const [rangeEnd, setRangeEnd] = useState<Date | undefined>(undefined);
-    const [calendarOpen, setCalendarOpen] = useState(false);
-    const [rangeStep, setRangeStep] = useState<'start' | 'end'>('start');
-
-    const effectiveFilterMode = isFilterActive ? filterMode : 'preset';
-    const effectivePresetPeriod = isFilterActive ? presetPeriod : 'month';
-
     // Fetch all orders (single-tenant, no franchise filtering)
     const { data: orders = [], isLoading: isLoadingOrders, isError: ordersError, refetch: refetchOrders } = useQuery({
         queryKey: ['admin-orders'],
@@ -71,54 +58,25 @@ export default function AdminDashboard() {
     });
     const customersList = useMemo(() => customersResponse?.data || [], [customersResponse]);
 
-    // Filter orders by selected date/range
-    const filteredOrders = useMemo(() => {
-        if (effectiveFilterMode === 'all') return orders;
-
-        const now = new Date();
-        const todayStart = startOfDay(now);
-
-        if (effectiveFilterMode === 'preset') {
-            let start = todayStart;
-            if (effectivePresetPeriod === 'week') {
-                start = startOfDay(subDays(now, 6));
-            } else if (effectivePresetPeriod === 'fortnight') {
-                start = startOfDay(subDays(now, 13));
-            } else if (effectivePresetPeriod === 'month') {
-                start = startOfMonth(now);
-            } else if (effectivePresetPeriod === 'quarter') {
-                start = startOfQuarter(now);
-            } else if (effectivePresetPeriod === 'year') {
-                start = startOfYear(now);
+    // Use the latest order date in the database as the reference "now" date.
+    // This ensures that when the database has data up to May 2026 and today is June 1st,
+    // the monthly preset automatically defaults to May 2026 (the active calendar month with data),
+    // rendering actual, useful metrics rather than empty zeros.
+    // Loop is stack-safe and ignores NaN date strings.
+    const now = useMemo(() => {
+        let maxTime = 0;
+        for (const o of orders) {
+            if (!o.createdAt) continue;
+            const t = new Date(o.createdAt).getTime();
+            if (!isNaN(t) && t > maxTime) {
+                maxTime = t;
             }
-            return orders.filter((o: any) => {
-                const d = new Date(o.createdAt || now);
-                return isWithinInterval(d, { start, end: endOfDay(now) });
-            });
         }
-
-        if (effectiveFilterMode === 'date' && selectedDate) {
-            return orders.filter((o: any) => {
-                const d = new Date(o.createdAt || now);
-                return isSameDay(d, selectedDate);
-            });
-        }
-
-        if (effectiveFilterMode === 'range' && rangeStart && rangeEnd) {
-            const start = startOfDay(rangeStart);
-            const end = endOfDay(rangeEnd);
-            return orders.filter((o: any) => {
-                const d = new Date(o.createdAt || now);
-                return isWithinInterval(d, { start, end });
-            });
-        }
-
-        return orders;
-    }, [orders, effectiveFilterMode, effectivePresetPeriod, selectedDate, rangeStart, rangeEnd]);
+        return maxTime > 0 ? new Date(maxTime) : new Date();
+    }, [orders]);
 
     // Calculate stats from calendar month, last 30 days, and same day last month
     const stats = useMemo(() => {
-        const now = new Date();
         const startOfThisMonth = startOfMonth(now);
         const last30DaysStart = subDays(startOfThisMonth, 30);
         const last30DaysEnd = startOfThisMonth;
@@ -133,90 +91,24 @@ export default function AdminDashboard() {
 
         const allActiveOrders = filterActive(orders);
 
-        let start: Date | null = null;
-        let end: Date | null = null;
-        let compStart: Date | null = null;
-        let compEnd: Date | null = null;
-        let periodLabel = 'all-time';
-
-        if (effectiveFilterMode === 'preset') {
-            if (effectivePresetPeriod === 'day') {
-                start = startOfToday;
-                end = todayEnd;
-                compStart = startOfDay(subDays(now, 1));
-                compEnd = endOfDay(subDays(now, 1));
-                periodLabel = 'yesterday';
-            } else if (effectivePresetPeriod === 'week') {
-                start = startOfDay(subDays(now, 6));
-                end = todayEnd;
-                compStart = startOfDay(subDays(start, 7));
-                compEnd = endOfDay(subDays(start, 1));
-                periodLabel = 'prev week';
-            } else if (effectivePresetPeriod === 'fortnight') {
-                start = startOfDay(subDays(now, 13));
-                end = todayEnd;
-                compStart = startOfDay(subDays(start, 14));
-                compEnd = endOfDay(subDays(start, 1));
-                periodLabel = 'prev 14d';
-            } else if (effectivePresetPeriod === 'month') {
-                start = startOfThisMonth;
-                end = todayEnd;
-                compStart = last30DaysStart;
-                compEnd = last30DaysEnd;
-                periodLabel = 'prev 30d';
-            } else if (effectivePresetPeriod === 'quarter') {
-                start = startOfQuarter(now);
-                end = todayEnd;
-                compStart = subDays(start, 90);
-                compEnd = start;
-                periodLabel = 'prev 90d';
-            } else if (effectivePresetPeriod === 'year') {
-                start = startOfYear(now);
-                end = todayEnd;
-                compStart = subDays(start, 365);
-                compEnd = start;
-                periodLabel = 'prev year';
-            }
-        } else if (effectiveFilterMode === 'date' && selectedDate) {
-            start = startOfDay(selectedDate);
-            end = endOfDay(selectedDate);
-            compStart = startOfDay(subDays(selectedDate, 1));
-            compEnd = endOfDay(subDays(selectedDate, 1));
-            periodLabel = 'prev day';
-        } else if (effectiveFilterMode === 'range' && rangeStart && rangeEnd) {
-            start = startOfDay(rangeStart);
-            end = endOfDay(rangeEnd);
-            const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-            compStart = startOfDay(subDays(start, diffDays));
-            compEnd = endOfDay(subDays(start, 1));
-            periodLabel = `prev ${diffDays}d`;
-        }
-
-        // Filter orders inside the selected period
+        // Filter orders inside the current calendar month (startOfThisMonth to todayEnd)
         const periodOrders = allActiveOrders.filter((o: any) => {
-            if (!start || !end) return true; // All Time
             const d = new Date(o.createdAt || now);
-            return d >= start && d <= end;
+            return d >= startOfThisMonth && d <= todayEnd;
         });
 
         const periodRevenue = periodOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
         const periodOrdersCount = periodOrders.length;
         const periodActiveCustomers = new Set(periodOrders.map((o: any) => o.customerId)).size;
 
-        // Filter orders inside the comparison period
-        let comparisonOrdersCount = 0;
-        let comparisonRevenue = 0;
-        let comparisonActiveCustomers = 0;
-
-        if (compStart && compEnd) {
-            const comparisonOrders = allActiveOrders.filter((o: any) => {
-                const d = new Date(o.createdAt || now);
-                return d >= compStart && d <= compEnd;
-            });
-            comparisonRevenue = comparisonOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
-            comparisonOrdersCount = comparisonOrders.length;
-            comparisonActiveCustomers = new Set(comparisonOrders.map((o: any) => o.customerId)).size;
-        }
+        // Filter orders inside the comparison period (last30DaysStart to last30DaysEnd)
+        const comparisonOrders = allActiveOrders.filter((o: any) => {
+            const d = new Date(o.createdAt || now);
+            return d >= last30DaysStart && d <= last30DaysEnd;
+        });
+        const comparisonRevenue = comparisonOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const comparisonOrdersCount = comparisonOrders.length;
+        const comparisonActiveCustomers = new Set(comparisonOrders.map((o: any) => o.customerId)).size;
 
         // Helper to calculate growth percentage where division by zero is handled properly
         const getGrowth = (current: number, previous: number) => {
@@ -228,12 +120,12 @@ export default function AdminDashboard() {
         const ordersGrowth = getGrowth(periodOrdersCount, comparisonOrdersCount);
         const customersGrowth = getGrowth(periodActiveCustomers, comparisonActiveCustomers);
 
-        // 3. Today's Revenue and Orders (always current day)
+        // Today's Revenue and Orders (always current day based on reference date)
         const todayOrders = allActiveOrders.filter((o: any) => new Date(o.createdAt || now) >= startOfToday);
         const todayRevenue = todayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
         const todayOrderCount = todayOrders.length;
 
-        // 4. Last Month Same Day Revenue
+        // Last Month Same Day Revenue
         const lastMonthSameDay = new Date(now);
         lastMonthSameDay.setMonth(now.getMonth() - 1);
         if (lastMonthSameDay.getDate() !== now.getDate()) {
@@ -248,48 +140,42 @@ export default function AdminDashboard() {
         const lastMonthSameDayRevenue = lastMonthSameDayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
         const todayRevenueGrowth = getGrowth(todayRevenue, lastMonthSameDayRevenue);
 
-        // 5. New Customers (this period vs comparison period, fallback to current month vs last 30 days for All Time)
-        const custStart = start || startOfThisMonth;
-        const custEnd = end || todayEnd;
-        const custCompStart = compStart || last30DaysStart;
-        const custCompEnd = compEnd || last30DaysEnd;
-        const custLabel = periodLabel === 'all-time' ? '30 days' : periodLabel;
-
+        // New Customers (this calendar month vs last 30 days)
         const newCustomersThisPeriod = customersList.filter((c: any) => 
-            c.createdAt && new Date(c.createdAt) >= custStart && new Date(c.createdAt) <= custEnd
+            c.createdAt && new Date(c.createdAt) >= startOfThisMonth && new Date(c.createdAt) <= todayEnd
         ).length;
 
         const newCustomersCompPeriod = customersList.filter((c: any) => 
-            c.createdAt && new Date(c.createdAt) >= custCompStart && new Date(c.createdAt) <= custCompEnd
+            c.createdAt && new Date(c.createdAt) >= last30DaysStart && new Date(c.createdAt) <= last30DaysEnd
         ).length;
 
         const newCustomersGrowth = getGrowth(newCustomersThisPeriod, newCustomersCompPeriod);
 
         return {
             totalRevenue: periodRevenue,
-            revenueGrowth: effectiveFilterMode === 'all' ? null : parseFloat(revenueGrowth.toFixed(1)),
-            revenueLabel: periodLabel,
+            revenueGrowth: parseFloat(revenueGrowth.toFixed(1)),
+            revenueLabel: 'prev 30d',
             comparisonRevenue: comparisonRevenue,
             totalOrders: periodOrdersCount,
-            ordersGrowth: effectiveFilterMode === 'all' ? null : parseFloat(ordersGrowth.toFixed(1)),
-            ordersLabel: periodLabel,
+            ordersGrowth: parseFloat(ordersGrowth.toFixed(1)),
+            ordersLabel: 'prev 30d',
             comparisonOrdersCount: comparisonOrdersCount,
             activeCustomers: periodActiveCustomers,
-            customersGrowth: effectiveFilterMode === 'all' ? null : parseFloat(customersGrowth.toFixed(1)),
-            customersLabel: periodLabel,
+            customersGrowth: parseFloat(customersGrowth.toFixed(1)),
+            customersLabel: 'prev 30d',
             newCustomers: newCustomersThisPeriod,
             newCustomersGrowth: parseFloat(newCustomersGrowth.toFixed(1)),
-            newCustomersLabel: custLabel,
+            newCustomersLabel: 'prev 30d',
             comparisonNewCustomers: newCustomersCompPeriod,
             todayRevenue,
             todayOrderCount,
             todayRevenueGrowth: parseFloat(todayRevenueGrowth.toFixed(1)),
             lastMonthSameDayRevenue,
         };
-    }, [orders, customersList, effectiveFilterMode, effectivePresetPeriod, selectedDate, rangeStart, rangeEnd]);
+    }, [orders, now, customersList]);
 
     const dueTodayOrders: any[] = useMemo(() => {
-        return filteredOrders.map((order: any) => ({
+        return orders.map((order: any) => ({
             id: order.id,
             orderNumber: order.orderNumber,
             customerName: order.customerName || 'Unknown',
@@ -300,10 +186,11 @@ export default function AdminDashboard() {
             pickupDate: order.pickupDate,
             createdAt: order.createdAt
         }));
-    }, [filteredOrders]);
+    }, [orders]);
 
     const recentOrders: any[] = useMemo(() => {
-        return filteredOrders
+        return orders
+            .slice() // Create a shallow copy before sorting to avoid side effects
             .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             .slice(0, 10)
             .map((order: any) => ({
@@ -318,55 +205,7 @@ export default function AdminDashboard() {
                 createdAt: order.createdAt,
                 isExpressOrder: order.isExpress
             }));
-    }, [filteredOrders]);
-
-    // Filter label for display
-    const filterLabel = useMemo(() => {
-        if (filterMode === 'preset') {
-            const selected = PERIOD_FILTERS.find((option) => option.value === presetPeriod);
-            return `${selected?.label || 'Day'} Sales`;
-        }
-        if (filterMode === 'date' && selectedDate) return format(selectedDate, 'dd MMM yyyy');
-        if (filterMode === 'range' && rangeStart && rangeEnd) return `${format(rangeStart, 'dd MMM')} — ${format(rangeEnd, 'dd MMM yyyy')}`;
-        return 'All Time View';
-    }, [filterMode, presetPeriod, selectedDate, rangeStart, rangeEnd]);
-
-    const handleDateSelect = (date: Date | undefined) => {
-        if (!date) return;
-        if (filterMode === 'range') {
-            if (rangeStep === 'start') {
-                setRangeStart(date);
-                setRangeEnd(undefined);
-                setRangeStep('end');
-            } else {
-                // Ensure end >= start
-                if (rangeStart && date < rangeStart) {
-                    setRangeEnd(rangeStart);
-                    setRangeStart(date);
-                } else {
-                    setRangeEnd(date);
-                }
-                setRangeStep('start');
-                setCalendarOpen(false);
-                setIsFilterActive(true);
-            }
-        } else {
-            setSelectedDate(date);
-            setFilterMode('date');
-            setCalendarOpen(false);
-            setIsFilterActive(true);
-        }
-    };
-
-    const clearFilter = () => {
-        setFilterMode('all');
-        setPresetPeriod('day');
-        setSelectedDate(undefined);
-        setRangeStart(undefined);
-        setRangeEnd(undefined);
-        setRangeStep('start');
-        setIsFilterActive(false);
-    };
+    }, [orders]);
 
     const statCards = [
         {
@@ -412,7 +251,6 @@ export default function AdminDashboard() {
                         <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                             Dashboard
                         </h1>
-
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-sm sm:w-auto sm:grid-cols-3">
                         <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
@@ -421,122 +259,14 @@ export default function AdminDashboard() {
                         </div>
                         <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Orders</p>
-                            <p className="mt-1 font-semibold text-foreground">{stats.totalOrders}</p>
+                            <p className="mt-1 font-semibold text-foreground">{orders.length}</p>
                         </div>
                         <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">Customers</p>
-                            <p className="mt-1 font-semibold text-foreground">{stats.activeCustomers}</p>
+                            <p className="mt-1 font-semibold text-foreground">{customersList.length}</p>
                         </div>
                     </div>
                 </div>
-            </section>
-
-            {/* Date Filter Bar */}
-            <section className="flex flex-wrap items-center gap-3">
-                <Button
-                    variant={isFilterActive && filterMode === 'all' ? 'pills' : 'outline'}
-                    size="sm"
-                    className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
-                    onClick={() => {
-                        setFilterMode('all');
-                        setIsFilterActive(true);
-                        setSelectedDate(undefined);
-                        setRangeStart(undefined);
-                        setRangeEnd(undefined);
-                        setRangeStep('start');
-                    }}
-                >
-                    All Time
-                </Button>
-                {PERIOD_FILTERS.map((period) => (
-                    <Button
-                        key={period.value}
-                        variant={isFilterActive && filterMode === 'preset' && presetPeriod === period.value ? 'pills' : 'outline'}
-                        size="sm"
-                        className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
-                        onClick={() => {
-                            setFilterMode('preset');
-                            setPresetPeriod(period.value);
-                            setIsFilterActive(true);
-                        }}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {period.label}
-                    </Button>
-                ))}
-
-                {/* Date Picker */}
-                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant={isFilterActive && filterMode === 'date' ? 'pills' : 'outline'}
-                            size="sm"
-                            className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
-                            onClick={() => {
-                                setFilterMode('date');
-                                setCalendarOpen(true);
-                            }}
-                        >
-                            <CalendarDays className="mr-2 h-4 w-4" />
-                            {isFilterActive && filterMode === 'date' && selectedDate
-                                ? format(selectedDate, 'dd MMM yyyy')
-                                : 'Select Date'}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 rounded-2xl shadow-2xl border-2" align="start">
-                        <div className="p-4 pb-2 border-b">
-                            <p className="text-sm font-black text-foreground">
-                                {filterMode === 'range'
-                                    ? (rangeStep === 'start' ? 'Select Start Date' : 'Select End Date')
-                                    : 'Select a Date'}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                {filterMode === 'range' && rangeStart && rangeStep === 'end'
-                                    ? `From: ${format(rangeStart, 'dd MMM yyyy')}`
-                                    : 'Pick a date to view stats'}
-                            </p>
-                        </div>
-                        <Calendar
-                            mode="single"
-                            selected={filterMode === 'range'
-                                ? (rangeStep === 'start' ? rangeStart : rangeEnd)
-                                : selectedDate}
-                            onSelect={handleDateSelect}
-                            disabled={(date) => date > new Date()}
-                            initialFocus
-                            className="rounded-b-2xl"
-                        />
-                    </PopoverContent>
-                </Popover>
-
-                {/* Date Range */}
-                <Button
-                    variant={isFilterActive && filterMode === 'range' ? 'pills' : 'outline'}
-                    size="sm"
-                    className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
-                    onClick={() => {
-                        setFilterMode('range');
-                        setRangeStart(undefined);
-                        setRangeEnd(undefined);
-                        setRangeStep('start');
-                        setCalendarOpen(true);
-                    }}
-                >
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    {isFilterActive && filterMode === 'range' && rangeStart && rangeEnd
-                        ? `${format(rangeStart, 'dd MMM')} — ${format(rangeEnd, 'dd MMM')}`
-                        : 'Date Range'}
-                </Button>
-
-                {/* Active filter indicator */}
-                {isFilterActive && (
-                    <Badge variant="secondary" className="rounded-full font-bold text-xs px-3 py-1 gap-1.5 bg-primary/10 text-primary border-primary/20">
-                        {filterLabel}
-                        <button onClick={clearFilter} className="ml-1 hover:bg-primary/20 rounded-full p-0.5">
-                            <X className="h-3 w-3" />
-                        </button>
-                    </Badge>
-                )}
             </section>
 
             {/* Key Metrics */}
