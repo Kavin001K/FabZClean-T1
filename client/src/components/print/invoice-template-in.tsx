@@ -826,12 +826,12 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 }}
               >
                 {/* ── TOP HALF: stamp + line-items side by side ── */}
-                <div style={{ display: 'flex', alignItems: 'center', minHeight: '132px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', minHeight: '160px' }}>
 
                   {/* LEFT — SVG rubber stamp */}
                   <div
                     style={{
-                      width: '148px',
+                      width: '192px',
                       flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
@@ -843,53 +843,53 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     {isExpressOrder ? (
                       /* ── EXPRESS PRIORITY SVG stamp ── */
                       <svg
-                        width="160"
-                        height="122"
-                        viewBox="0 0 160 122"
+                        width="188"
+                        height="155"
+                        viewBox="0 0 188 155"
                         overflow="visible"
-                        style={{ display: 'block', transform: 'rotate(-6deg)' }}
+                        style={{ display: 'block', transform: 'rotate(-5deg)' }}
                       >
-                        {/* Outer circle — cream fill, solid border */}
-                        <circle cx="90" cy="61" r="57" fill="#fff8f4" stroke="#c2410c" strokeWidth="3"/>
+                        {/* Outer circle — cream fill */}
+                        <circle cx="98" cy="77" r="72" fill="#fff8f4" stroke="#c2410c" strokeWidth="3"/>
                         {/* Inner ring */}
-                        <circle cx="90" cy="61" r="50" fill="none" stroke="#c2410c" strokeWidth="1.5"/>
+                        <circle cx="98" cy="77" r="63" fill="none" stroke="#c2410c" strokeWidth="1.5"/>
 
                         {/* EXPRESS — centered on circle */}
-                        <text x="90" y="20" textAnchor="middle"
+                        <text x="98" y="24" textAnchor="middle"
                           fontFamily="'Arial Black', Arial, sans-serif"
-                          fontSize="10" fontWeight="900" fill="#c2410c" letterSpacing="3">EXPRESS</text>
+                          fontSize="11" fontWeight="900" fill="#c2410c" letterSpacing="4">EXPRESS</text>
 
                         {/* Top stars: — ★ ★ ★ — */}
-                        <line x1="44" y1="29" x2="62" y2="29" stroke="#c2410c" strokeWidth="1.3"/>
-                        <text x="90" y="33" textAnchor="middle" fontFamily="Arial" fontSize="9" fill="#c2410c" letterSpacing="5">★ ★ ★</text>
-                        <line x1="118" y1="29" x2="136" y2="29" stroke="#c2410c" strokeWidth="1.3"/>
+                        <line x1="44" y1="33" x2="64" y2="33" stroke="#c2410c" strokeWidth="1.4"/>
+                        <text x="98" y="37" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#c2410c" letterSpacing="6">★ ★ ★</text>
+                        <line x1="132" y1="33" x2="152" y2="33" stroke="#c2410c" strokeWidth="1.4"/>
 
-                        {/* Top band bar — full card-spanning width */}
-                        <rect x="-80" y="40" width="400" height="2.5" fill="#c2410c"/>
+                        {/* Top band bar */}
+                        <rect x="-20" y="46" width="260" height="3" fill="#c2410c"/>
 
-                        {/* PRIORITY — textLength forces exact 166px width; starts at x=-8
-                            so left tip of P is clipped by card overflow:hidden,
-                            right end Y sits at x=158 well within the card */}
+                        {/* PRIORITY — x=6 so "P" starts 10px from card left (fully visible)
+                            textLength=180 forces exact width: spans x=6→186, all chars shown
+                            circle spans x=26→170, so PRIORITY extends beyond circle on both sides */}
                         <text
-                          x="-8" y="76"
+                          x="6" y="92"
                           textAnchor="start"
-                          textLength="166"
+                          textLength="180"
                           lengthAdjust="spacingAndGlyphs"
-                          fontFamily="'Arial Black', Impact, Arial, sans-serif"
-                          fontSize="40" fontWeight="900" fill="#c2410c">PRIORITY</text>
+                          fontFamily="Impact, 'Arial Black', Arial, sans-serif"
+                          fontSize="46" fontWeight="900" fill="#c2410c">PRIORITY</text>
 
                         {/* Bottom band bar */}
-                        <rect x="-80" y="81" width="400" height="2.5" fill="#c2410c"/>
+                        <rect x="-20" y="98" width="260" height="3" fill="#c2410c"/>
 
-                        {/* SAFE & CLEAN — centered on circle */}
-                        <text x="90" y="95" textAnchor="middle"
+                        {/* SAFE & CLEAN */}
+                        <text x="98" y="114" textAnchor="middle"
                           fontFamily="'Arial Black', Arial, sans-serif"
-                          fontSize="9" fontWeight="900" fill="#c2410c" letterSpacing="2.5">SAFE &amp; CLEAN</text>
+                          fontSize="10" fontWeight="900" fill="#c2410c" letterSpacing="3">SAFE &amp; CLEAN</text>
 
                         {/* Bottom stars */}
-                        <line x1="44" y1="103" x2="62" y2="103" stroke="#c2410c" strokeWidth="1.3"/>
-                        <text x="90" y="107" textAnchor="middle" fontFamily="Arial" fontSize="9" fill="#c2410c" letterSpacing="5">★ ★ ★</text>
-                        <line x1="118" y1="103" x2="136" y2="103" stroke="#c2410c" strokeWidth="1.3"/>
+                        <line x1="44" y1="124" x2="64" y2="124" stroke="#c2410c" strokeWidth="1.4"/>
+                        <text x="98" y="128" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#c2410c" letterSpacing="6">★ ★ ★</text>
+                        <line x1="132" y1="124" x2="152" y2="124" stroke="#c2410c" strokeWidth="1.4"/>
                       </svg>
                     ) : isEditedInvoice ? (
                       /* ── REVISED BILL SVG stamp ── */
