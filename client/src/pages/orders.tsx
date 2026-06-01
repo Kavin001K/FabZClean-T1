@@ -1195,12 +1195,23 @@ function OrdersComponent() {
   }, []);
 
   // Calculate Quick Stats
-  // Calculate Quick Stats
   const stats = useMemo(() => {
-    const now = new Date();
-    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    // Robust, stack-safe determination of the reference "now" date from orders
+    const referenceDate = (() => {
+      let maxTime = 0;
+      for (const o of orders) {
+        if (!o.createdAt) continue;
+        const t = new Date(o.createdAt).getTime();
+        if (!isNaN(t) && t > maxTime) {
+          maxTime = t;
+        }
+      }
+      return maxTime > 0 ? new Date(maxTime) : new Date();
+    })();
+
+    const startOfThisMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+    const startOfLastMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 0, 23, 59, 59);
 
     // Helper to filter active orders (non-cancelled, non-refunded, non-deleted)
     const filterActive = (orderList: any[]) => orderList.filter((o: any) => {
@@ -1210,10 +1221,10 @@ function OrdersComponent() {
 
     const allActiveOrders = filterActive(orders);
 
-    // Filter active orders for this month
+    // Filter active orders for this month (using referenceDate as end boundary)
     const thisMonthActiveOrders = allActiveOrders.filter(o => {
-      const d = new Date(o.createdAt || now);
-      return d >= startOfThisMonth && d <= now;
+      const d = new Date(o.createdAt || referenceDate);
+      return d >= startOfThisMonth && d <= referenceDate;
     });
 
     const totalOrders = thisMonthActiveOrders.length;
@@ -1222,8 +1233,8 @@ function OrdersComponent() {
 
     // Filter all orders (including cancelled/refunded/deleted) for this month's completed/pending
     const thisMonthOrders = orders.filter(o => {
-      const d = new Date(o.createdAt || now);
-      return d >= startOfThisMonth && d <= now;
+      const d = new Date(o.createdAt || referenceDate);
+      return d >= startOfThisMonth && d <= referenceDate;
     });
     const completedOrders = thisMonthOrders.filter(o => o.status === 'completed').length;
     const pendingOrders = thisMonthOrders.filter(o => o.status === 'pending').length;
@@ -1231,7 +1242,7 @@ function OrdersComponent() {
 
     // Filter comparison period stats (last month)
     const lastMonthActiveOrders = allActiveOrders.filter(o => {
-      const d = new Date(o.createdAt || now);
+      const d = new Date(o.createdAt || referenceDate);
       return d >= startOfLastMonth && d <= endOfLastMonth;
     });
     const lastMonthOrdersCount = lastMonthActiveOrders.length;
