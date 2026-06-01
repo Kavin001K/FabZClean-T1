@@ -195,6 +195,7 @@ export interface InvoicePrintData {
   subtotal: number;
   tax: number;
   discount?: number;
+  expressSurcharge?: number;
   total: number;
   paymentMethod?: string;
   paymentStatus?: string;
@@ -493,7 +494,9 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
 
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const tax = enableGST ? items.reduce((sum, item) => sum + (item.total * (item.taxRate || 0) / 100), 0) : 0;
-  const total = subtotal + tax;
+  const isExpress = order.isExpressOrder || order.is_express_order || false;
+  const expressSurcharge = isExpress ? subtotal * 0.5 : 0;
+  const total = subtotal + tax + expressSurcharge;
 
   // Generate invoice number with franchise prefix
   const branchCode = franchise.branchCode;
@@ -550,15 +553,16 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     items,
     subtotal,
     tax,
+    expressSurcharge,
     total,
     paymentMethod: order.paymentMethod || 'Cash',
     paymentStatus: order.paymentStatus || order.status || 'Pending',
-    notes: order.notes || order.specialInstructions || `Order Status: ${order.status}`,
+    notes: order.notes || order.specialInstructions || '',
     terms: enableGST
       ? 'GST Invoice. Tax is calculated at applicable rates. Payment due within 30 days.'
       : 'Payment due within 30 days of invoice date.',
     status: order.status,
-    isExpressOrder: order.isExpressOrder || order.is_express_order || false,
+    isExpressOrder: isExpress,
     isUpdate,
     paymentBreakdown,
   };
@@ -1025,6 +1029,7 @@ export class PrintDriver {
         status: (data as any).status,
         qrCode: qrCodeDataUrl,
         isExpressOrder: data.isExpressOrder || false,
+        expressSurcharge: data.expressSurcharge || 0,
         paymentBreakdown: data.paymentBreakdown,
       };
 
@@ -1076,28 +1081,17 @@ export class PrintDriver {
         do {
           attempts++;
           const imgData = canvas.toDataURL('image/jpeg', currentQuality);
+          const imgWidth = 210;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
           const pdf = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
-            format: 'a4',
+            format: [210, imgHeight],
             compress: true,
           });
 
-          const imgWidth = 210;
-          const pageHeight = 297;
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          let heightLeft = imgHeight;
-          let position = 0;
-
-          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-          heightLeft -= pageHeight;
-
-          while (heightLeft > 5) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-            heightLeft -= pageHeight;
-          }
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
 
           pdfBlob = pdf.output('blob');
           const sizeKB = pdfBlob.size / 1024;

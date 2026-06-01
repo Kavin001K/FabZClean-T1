@@ -779,9 +779,37 @@ function OrdersComponent() {
     printInvoice(order);
   }, [printInvoice]);
 
-   const handleSendBill = useCallback((order: Order) => {
-    resendBillMutation.mutate({ order });
-  }, [resendBillMutation]);
+   const handleSendBill = useCallback(async (order: Order) => {
+    try {
+      toast({
+        title: 'Generating Bill',
+        description: 'Generating a fresh invoice PDF before sending WhatsApp...',
+      });
+
+      // 1. Convert order to print data and trigger PDF generation/upload
+      const invoiceData = convertOrderToInvoiceData(order, false, false);
+      
+      // Generate and upload the new PDF (outputMode: 'none' ensures it only uploads and doesn't download)
+      const savedDoc = await printDriver.generateInvoiceDocument(invoiceData, 'invoice', { outputMode: 'none' });
+      const newInvoiceUrl = savedDoc?.document?.fileUrl || savedDoc?.fileUrl || savedDoc?.url;
+      
+      if (newInvoiceUrl) {
+        console.log('[Orders] Fresh invoice generated and uploaded:', newInvoiceUrl);
+        resendBillMutation.mutate({ 
+          order, 
+          customInvoiceUrl: newInvoiceUrl,
+          isUpdate: false 
+        });
+      } else {
+        console.warn('[Orders] Could not get new invoice URL, falling back');
+        resendBillMutation.mutate({ order, isUpdate: false });
+      }
+    } catch (err) {
+      console.error('[Orders] Error in bill generation before resend:', err);
+      // Fallback: send without custom URL if generation failed
+      resendBillMutation.mutate({ order, isUpdate: false });
+    }
+  }, [resendBillMutation, toast]);
 
   const handleNextStep = useCallback((order: Order) => {
     if (isWorkflowLocked(order)) {

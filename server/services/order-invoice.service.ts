@@ -392,17 +392,8 @@ async function hydrateOrderForInvoice(orderId: string, templateId?: string): Pro
 async function buildInvoiceBuffer(context: EnrichedInvoiceOrder): Promise<Buffer> {
   const { order, template } = context;
   const templateConfig = getTemplateConfig(template);
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-    compress: true,
-  });
-
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 8;
-  const contentWidth = pageWidth - (margin * 2);
+  const contentWidth = 210 - (margin * 2);
   const accent: [number, number, number] = [10, 174, 132];
   const accentDark: [number, number, number] = [15, 118, 110];
   const ink: [number, number, number] = [17, 24, 39];
@@ -416,9 +407,32 @@ async function buildInvoiceBuffer(context: EnrichedInvoiceOrder): Promise<Buffer
   const deliveryCharges = coerceNumber(order.deliveryCharges, 0);
   const discountValue = coerceNumber(order.discountValue, 0);
   const gstAmount = coerceNumber(order.gstAmount, 0);
-  const total = coerceNumber(order.totalAmount, subtotalFromItems + extraCharges + deliveryCharges + gstAmount - discountValue);
+  const isExpress = !!(order as any).isExpressOrder || !!(order as any).is_express_order;
+  const expressSurcharge = isExpress ? subtotalFromItems * 0.5 : 0;
+  const total = coerceNumber(order.totalAmount, subtotalFromItems + expressSurcharge + extraCharges + deliveryCharges + gstAmount - discountValue);
   const subtotal = subtotalFromItems;
   const dueDate = order.pickupDate || order.createdAt;
+
+  // Let's compute custom height dynamically!
+  const bookingTagVal = safeText((order as any).bookingId || (order as any).booking_id, '');
+  const hasBooking = bookingTagVal.length > 0;
+  // Base spacing height: margin top (8) + header (45) + From/BillTo cards (48) + spacing (5) + Issued/Due cards (18) + spacing (4) + Fulfillment card (hasBooking ? 30 : 24)
+  // Table header: 14. Totals box & QR: 46. Terms box: 40. Footer: 16. margin bottom (8).
+  const baseSpacingHeight = 8 + 45 + 48 + 5 + 18 + 4 + (hasBooking ? 30 : 24) + 14 + 46 + 40 + 16 + 8;
+  
+  // Each item height is typically 14mm
+  const itemsHeight = items.length * 14;
+  const customHeight = Math.max(297, baseSpacingHeight + itemsHeight);
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: [210, customHeight],
+    compress: true,
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const displayAddress = parseAddress(order.deliveryAddress || order.shippingAddress || order.customerAddress || order.address);
   const logoDataUri = await loadLogoDataUri();
   const paymentQr = templateConfig.showPaymentQr
@@ -587,11 +601,6 @@ async function buildInvoiceBuffer(context: EnrichedInvoiceOrder): Promise<Buffer
     const descriptionLines = splitText(item.note ? `${item.name} (${item.note})` : item.name, contentWidth - 82);
     const rowHeight = Math.max(14, 8 + (descriptionLines.length * 4.5));
 
-    if (cursorY + rowHeight > pageHeight - 88) {
-      doc.addPage();
-      cursorY = 18;
-    }
-
     doc.setFillColor(index % 2 === 0 ? 255 : 249, index % 2 === 0 ? 255 : 251, index % 2 === 0 ? 255 : 253);
     doc.setDrawColor(...line);
     doc.rect(margin, cursorY - 4, contentWidth, rowHeight, 'FD');
@@ -668,6 +677,12 @@ async function buildInvoiceBuffer(context: EnrichedInvoiceOrder): Promise<Buffer
     totalsY += 6;
   }
 
+  if (expressSurcharge > 0) {
+    doc.text('Express Surcharge', totalsX, totalsY);
+    doc.text(formatCurrency(expressSurcharge), valueX, totalsY, { align: 'right' });
+    totalsY += 6;
+  }
+
   if (coerceNumber(order.gstAmount, 0) > 0 && (order.gstEnabled || templateConfig.showGstBreakup)) {
     doc.text(`GST (${coerceNumber(order.gstRate, 0).toFixed(0)}%)`, totalsX, totalsY);
     doc.text(formatCurrency(gstAmount), valueX, totalsY, { align: 'right' });
@@ -704,11 +719,64 @@ async function buildInvoiceBuffer(context: EnrichedInvoiceOrder): Promise<Buffer
         '1. Payment due on delivery or pickup.',
         '2. We are not responsible for natural wear and tear.',
         '3. Review garments at the time of handover.',
-        `4. Order status: ${safeText(order.status, 'pending')}.`,
       ].join(' '),
     qrBoxWidth - 10
   );
   doc.text(termLines.slice(0, 6), margin + 5, termsTop + 17);
+
+  // Extract payment breakdown on the server
+  const walletDeducted = coerceNumber((order as any).walletUsed || (order as any).wallet_used, 0);
+  const creditOutstanding = coerceNumber((order as any).creditUsed || (order as any).credit_used, 0);
+  const advancePaid = coerceNumber((order as any).advancePaid || (order as any).advance_paid, 0);
+  const cashPaid = Math.max(0, advancePaid - walletDeducted);
+  const previousOutstanding = coerceNumber(
+    (order as any).customerOutstandingBefore ?? (order as any).customer_outstanding_before ??
+    ((order as any).split?.previousOutstanding), 0
+  );
+  const newOutstanding = coerceNumber(
+    (order as any).customerOutstandingAfter ?? (order as any).customer_outstanding_after ??
+    (previousOutstanding + creditOutstanding), 0
+  );
+  const hasPaymentBreakdown = (walletDeducted > 0 || creditOutstanding > 0 || cashPaid > 0);
+
+  if (hasPaymentBreakdown) {
+    const payTop = footerTop + 40;
+    drawCard(margin + qrBoxWidth + 4, payTop, totalBoxWidth, 36);
+    doc.setTextColor(...accentDark);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.text('PAYMENT SUMMARY', margin + qrBoxWidth + 9, payTop + 8);
+    
+    doc.setTextColor(...ink);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    let payY = payTop + 14;
+    if (walletDeducted > 0) {
+      doc.text('Wallet Deducted', margin + qrBoxWidth + 9, payY);
+      doc.text(`-${formatCurrency(walletDeducted)}`, valueX - 5, payY, { align: 'right' });
+      payY += 5;
+    }
+    if (cashPaid > 0) {
+      doc.text(`${safeText((order as any).paymentMethod || 'Cash').toUpperCase()} Paid`, margin + qrBoxWidth + 9, payY);
+      doc.text(`-${formatCurrency(cashPaid)}`, valueX - 5, payY, { align: 'right' });
+      payY += 5;
+    }
+    if (creditOutstanding > 0) {
+      doc.text('Added to Outstanding', margin + qrBoxWidth + 9, payY);
+      doc.text(formatCurrency(creditOutstanding), valueX - 5, payY, { align: 'right' });
+      payY += 5;
+    }
+    
+    // Draw outstanding balance block
+    doc.setFillColor(254, 251, 236); // Light amber
+    doc.rect(margin + qrBoxWidth + 6, payTop + 24, totalBoxWidth - 4, 8, 'F');
+    doc.setTextColor(146, 64, 14); // Dark amber
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text('OUTSTANDING BALANCE', margin + qrBoxWidth + 9, payTop + 29.5);
+    doc.setFontSize(9.5);
+    doc.text(formatCurrency(newOutstanding), valueX - 5, payTop + 29.5, { align: 'right' });
+  }
 
   doc.setFillColor(...tableHeader);
   doc.rect(0, pageHeight - 16, pageWidth, 16, 'F');

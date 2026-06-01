@@ -337,13 +337,13 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       <style>{`
         @page {
           size: A4;
-          margin: 8mm;
+          margin: 4mm;
         }
 
         .invoice-shell {
           background: #ffffff;
           box-shadow: ${shadow};
-          min-height: 297mm;
+          min-height: 289mm;
           overflow: hidden;
         }
 
@@ -421,28 +421,28 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             style={{
               background: `linear-gradient(135deg, ${isExpressOrder ? '#ea580c' : '#059669'} 0%, ${isExpressOrder ? '#f97316' : '#10b981'} 100%)`,
               color: '#ffffff',
-              padding: '18px 22px',
+              padding: '12px 18px',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                 <div
                   style={{
                     background: '#ffffff',
                     borderRadius: '8px',
-                    padding: '8px 12px',
-                    minWidth: '112px',
+                    padding: '4px 8px',
+                    minWidth: '100px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 8px 18px rgba(15, 23, 42, 0.14)',
+                    boxShadow: '0 6px 14px rgba(15, 23, 42, 0.12)',
                   }}
                 >
-                  <img src={companyDetails.logo} alt="Fab Clean" style={{ width: '92px', height: 'auto', objectFit: 'contain' }} />
+                  <img src={companyDetails.logo} alt="Fab Clean" style={{ width: '80px', height: 'auto', objectFit: 'contain' }} />
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 900, lineHeight: 1.05 }}>Fab Clean</h1>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.94 }}>
+                  <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900, lineHeight: 1.05 }}>Fab Clean</h1>
+                  <p style={{ margin: '3px 0 0', fontSize: '11px', opacity: 0.94 }}>
                     Premium Laundry & Dry Cleaning Services
                   </p>
                 </div>
@@ -505,13 +505,13 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                       letterSpacing: '0.12em',
                     }}
                   >
-                    Invoice
+                  Invoice
                   </span>
                 </div>
-                <p style={{ margin: 0, fontSize: '11px', opacity: 0.78, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+                <p style={{ margin: 0, fontSize: '10px', opacity: 0.78, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
                   Order Ref
                 </p>
-                <p style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 900, letterSpacing: '0.03em' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '20px', fontWeight: 900, letterSpacing: '0.03em' }}>
                   #{orderCode}
                 </p>
               </div>
@@ -519,14 +519,14 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           </header>
 
           {(visualPreset === 'express' || isEditedInvoice) && (
-            <section className="invoice-section" style={{ padding: '14px 18px 0' }}>
+            <section className="invoice-section" style={{ padding: '10px 18px 0' }}>
               <div
                 className="invoice-card"
                 style={{
                   background: accentSoft,
                   border: `1px solid ${accentBorder}`,
-                  borderRadius: '14px',
-                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  padding: '10px 12px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   gap: '18px',
@@ -558,15 +558,15 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
               </div>
             </section>
           )}
-          <div style={{ padding: '16px 18px 0' }}>
-            <section className="invoice-section invoice-grid-2" style={{ marginBottom: '12px' }}>
+          <div style={{ padding: '10px 18px 0' }}>
+            <section className="invoice-section invoice-grid-2" style={{ marginBottom: '8px' }}>
               <div
                 className="invoice-card"
                 style={{
                   background: panel,
                   border: `1px solid ${line}`,
                   borderRadius: '12px',
-                  padding: '16px',
+                  padding: '12px',
                 }}
               >
                 <p style={sectionTitleStyle(mutedInk)}>From</p>
@@ -613,7 +613,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   background: panel,
                   border: `1px solid ${line}`,
                   borderRadius: '12px',
-                  padding: '16px',
+                  padding: '12px',
                 }}
               >
                 <p style={sectionTitleStyle(accent)}>Bill To</p>
@@ -651,7 +651,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
               </div>
             </section>
 
-            <section className="invoice-section invoice-meta-grid" style={{ marginBottom: '12px' }}>
+            <section className="invoice-section invoice-meta-grid" style={{ marginBottom: '8px' }}>
               {invoiceMetaRows.slice(0, 2).map(({ label, value, Icon }) => (
                 <div
                   key={label}
@@ -660,7 +660,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     background: panel,
                     border: `1px solid ${line}`,
                     borderRadius: '10px',
-                    padding: '14px 16px',
+                    padding: '10px 12px',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -679,11 +679,11 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             <section
               className="invoice-section invoice-card"
               style={{
-                marginBottom: '12px',
+                marginBottom: '8px',
                 background: panel,
                 border: `1px solid ${line}`,
                 borderRadius: '10px',
-                padding: '14px 16px',
+                padding: '10px 12px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between' }}>
@@ -709,7 +709,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
               </div>
             </section>
 
-            <section className="invoice-section" style={{ marginBottom: '12px' }}>
+            <section className="invoice-section" style={{ marginBottom: '8px' }}>
               <table className="invoice-items-table">
                 <thead>
                   <tr>
@@ -757,7 +757,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
               </table>
             </section>
 
-            <section className="invoice-section invoice-grid-2" style={{ alignItems: 'start', marginBottom: '12px' }}>
+            <section className="invoice-section invoice-grid-2" style={{ gridTemplateColumns: '44% 56%', alignItems: 'start', marginBottom: '8px' }}>
               <div style={{ display: 'grid', gap: '12px' }}>
                 <div
                   className="invoice-payment-card"
@@ -765,7 +765,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     background: panel,
                     border: `1px solid ${line}`,
                     borderRadius: '10px',
-                    padding: '14px 16px',
+                    padding: '10px 12px',
                   }}
                 >
                   <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
@@ -799,7 +799,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     background: panel,
                     border: `1px dashed ${line}`,
                     borderRadius: '10px',
-                    padding: '14px 16px',
+                    padding: '10px 12px',
                   }}
                 >
                   <p style={sectionTitleStyle(accent)}>Terms & Conditions</p>
@@ -807,7 +807,9 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     <div>1. Payment due on delivery or pickup.</div>
                     <div>2. We are not responsible for natural wear and tear.</div>
                     <div>3. Review garments at the time of handover.</div>
-                    {(notes || paymentTerms) && <div>4. {notes || paymentTerms}</div>}
+                    {((notes && !notes.toLowerCase().includes('order status')) || paymentTerms) && (
+                      <div>4. {notes || paymentTerms}</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -818,7 +820,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   background: panel,
                   border: `1px solid ${line}`,
                   borderRadius: '10px',
-                  padding: '14px 16px',
+                  padding: '10px 12px',
                   position: 'relative',
                 }}
               >
@@ -897,9 +899,9 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     </>
                   )}
                   <div style={{ height: '3px', background: accent, borderRadius: '999px', marginTop: '4px' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: 900, color: headingInk, textTransform: 'uppercase' }}>Grand Total</span>
-                    <span style={{ fontSize: '34px', fontWeight: 900, color: accent, fontFamily: '"IBM Plex Mono", monospace' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 900, color: headingInk, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Grand Total</span>
+                    <span style={{ fontSize: '26px', fontWeight: 900, color: accent, fontFamily: '"IBM Plex Mono", monospace', whiteSpace: 'nowrap' }}>
                       {formatIndianCurrency(grandTotal)}
                     </span>
                   </div>
@@ -920,15 +922,15 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
               </div>
             </section>
 
-            {paymentBreakdown && (
+             {paymentBreakdown && (
               <section
                 className="invoice-section invoice-payment-card"
                 style={{
                   background: panelSoft,
                   border: `1px solid ${line}`,
                   borderRadius: '10px',
-                  padding: '14px 16px',
-                  marginBottom: '14px',
+                  padding: '10px 12px',
+                  marginBottom: '8px',
                 }}
               >
                 <p style={sectionTitleStyle(accent)}>Payment Summary</p>
@@ -1010,15 +1012,15 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             style={{
               background: '#1e293b',
               color: '#ffffff',
-              padding: '12px 18px',
+              padding: '8px 16px',
               display: 'flex',
               justifyContent: 'space-between',
               gap: '14px',
               alignItems: 'center',
             }}
           >
-            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>Thank you for choosing Fab Clean.</p>
-            <p style={{ margin: 0, fontSize: '10px', opacity: 0.72 }}>This is a computer-generated invoice. No signature required.</p>
+            <p style={{ margin: 0, fontSize: '12px', fontWeight: 700 }}>Thank you for choosing Fab Clean.</p>
+            <p style={{ margin: 0, fontSize: '9px', opacity: 0.72 }}>This is a computer-generated invoice. No signature required.</p>
           </footer>
         </div>
       </div>
