@@ -191,7 +191,7 @@ export default function AdminDashboard() {
     const recentOrders: any[] = useMemo(() => {
         return orders
             .slice() // Create a shallow copy before sorting to avoid side effects
-            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''))
             .slice(0, 10)
             .map((order: any) => ({
                 id: order.id,

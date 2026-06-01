@@ -165,7 +165,7 @@ export default function EnhancedEmployeeDashboard() {
   });
 
   const recentOrders = [...orders].sort((a: DashboardOrder, b: DashboardOrder) =>
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (b.orderNumber || '').localeCompare(a.orderNumber || '')
   ).slice(0, 5);
 
   // Calculate real stats from orders

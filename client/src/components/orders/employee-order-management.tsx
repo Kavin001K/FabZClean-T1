@@ -110,7 +110,7 @@ export default function EmployeeOrderManagement() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [showStatusUpdate, setShowStatusUpdate] = useState(false);
-  const [sortField, setSortField] = useState<string>('createdAt');
+  const [sortField, setSortField] = useState<string>('orderNumber');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Fetch orders with caching

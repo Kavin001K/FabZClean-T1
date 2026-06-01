@@ -220,7 +220,7 @@ function OrdersComponent() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const [sortField, setSortField] = useState<keyof Order | null>('createdAt');
+  const [sortField, setSortField] = useState<keyof Order | null>('orderNumber');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [isBulkOperationLoading, setIsBulkOperationLoading] = useState(false);
