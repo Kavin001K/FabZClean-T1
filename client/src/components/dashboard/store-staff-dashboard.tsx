@@ -22,7 +22,20 @@ export default function StoreStaffDashboard() {
     });
     const orders = Array.isArray(ordersRes) ? ordersRes : (ordersRes as any)?.data || [];
 
-    const today = new Date().toISOString().split("T")[0];
+    // Robust, stack-safe determination of the reference "now" date from orders
+    const referenceDate = (() => {
+        let maxTime = 0;
+        for (const o of orders) {
+            if (!o.createdAt) continue;
+            const t = new Date(o.createdAt).getTime();
+            if (!isNaN(t) && t > maxTime) {
+                maxTime = t;
+            }
+        }
+        return maxTime > 0 ? new Date(maxTime) : new Date();
+    })();
+
+    const today = referenceDate.toISOString().split("T")[0];
 
     const todaysOrders = orders.filter((o: any) => {
         const created = new Date(o.createdAt || 0);
@@ -31,7 +44,7 @@ export default function StoreStaffDashboard() {
                status !== 'cancelled' && 
                status !== 'refunded' && 
                status !== 'deleted';
-    });
+    }).sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''));
 
     const todaysRevenue = todaysOrders.reduce(
         (sum: number, o: any) => sum + parseFloat(o.totalAmount || o.total_amount || "0"),
@@ -47,7 +60,7 @@ export default function StoreStaffDashboard() {
     );
 
     // Monthly summary
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const startOfMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
     const thisMonthRevenue = orders.reduce((sum: number, o: any) => {
         const created = new Date(o.createdAt || 0);
         const status = String(o.status || '').toLowerCase();
@@ -63,7 +76,7 @@ export default function StoreStaffDashboard() {
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Hey, {employee?.fullName?.split(" ")[0] || "Staff"} 👋</h1>
                 <p className="text-sm text-muted-foreground">
-                    Your shift dashboard — {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" })}
+                    Your shift dashboard — {referenceDate.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" })}
                 </p>
             </div>
 

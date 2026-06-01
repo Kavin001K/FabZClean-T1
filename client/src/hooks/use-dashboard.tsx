@@ -103,6 +103,18 @@ export function useDashboard() {
     [customers]
   );
 
+  const referenceDate = useMemo(() => {
+    let maxTime = 0;
+    for (const o of safeOrders) {
+      if (!o.createdAt) continue;
+      const t = new Date(o.createdAt).getTime();
+      if (!isNaN(t) && t > maxTime) {
+        maxTime = t;
+      }
+    }
+    return maxTime > 0 ? new Date(maxTime) : new Date();
+  }, [safeOrders]);
+
   const filteredOrders = useMemo(() => {
     return safeOrders.filter((order) => {
       if (!isWithinSelectedRange(order.createdAt, filters.dateRange)) return false;
@@ -128,7 +140,7 @@ export function useDashboard() {
   }, [safeCustomers, filters.dateRange]);
 
   const dueDateStats = useMemo(() => {
-    const today = startOfDay(new Date());
+    const today = startOfDay(referenceDate);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const dayAfterTomorrow = new Date(tomorrow);
@@ -150,10 +162,10 @@ export function useDashboard() {
       overdue: 0,
       upcoming: 0,
     });
-  }, [safeOrders]);
+  }, [safeOrders, referenceDate]);
 
   const ordersTodayCount = useMemo(() => {
-    const today = startOfDay(new Date());
+    const today = startOfDay(referenceDate);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -163,10 +175,10 @@ export function useDashboard() {
       new Date(order.createdAt) >= today &&
       new Date(order.createdAt) < tomorrow
     ).length;
-  }, [safeOrders]);
+  }, [safeOrders, referenceDate]);
 
   const revenueToday = useMemo(() => {
-    const today = startOfDay(new Date());
+    const today = startOfDay(referenceDate);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -176,10 +188,10 @@ export function useDashboard() {
       if (createdAt < today || createdAt >= tomorrow) return sum;
       return sum + toAmount(order.totalAmount);
     }, 0);
-  }, [safeOrders]);
+  }, [safeOrders, referenceDate]);
 
   const ordersCompletedToday = useMemo(() => {
-    const today = startOfDay(new Date());
+    const today = startOfDay(referenceDate);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -190,18 +202,18 @@ export function useDashboard() {
       const date = new Date(timestamp);
       return date >= today && date < tomorrow;
     }).length;
-  }, [safeOrders]);
+  }, [safeOrders, referenceDate]);
 
   const pendingOrdersCount = useMemo(() => {
     return safeOrders.filter((order) => ACTIVE_ORDER_STATUSES.includes(order.status)).length;
   }, [safeOrders]);
 
   const newCustomersToday = useMemo(() => {
-    const today = startOfDay(new Date());
+    const today = startOfDay(referenceDate);
     return safeCustomers.filter((customer) =>
       customer.createdAt && new Date(customer.createdAt) >= today
     ).length;
-  }, [safeCustomers]);
+  }, [safeCustomers, referenceDate]);
 
   const orderStatusData = useMemo((): OrderStatusData[] => {
     const total = filteredOrders.length;
@@ -271,11 +283,7 @@ export function useDashboard() {
 
   const processedRecentOrders = useMemo(() => {
     return [...safeOrders]
-      .sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateB - dateA;
-      })
+      .sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''))
       .slice(0, 10)
       .map(order => ({
         ...order,
@@ -288,13 +296,14 @@ export function useDashboard() {
   }, [safeOrders]);
 
   const dueTodayOrders = useMemo(() => {
-    const today = startOfDay(new Date());
+    const today = startOfDay(referenceDate);
     return safeOrders
       .filter((order) => {
         if (!isOrderActive(order) || !order.pickupDate) return false;
         const pickupDate = startOfDay(new Date(order.pickupDate));
         return pickupDate <= today;
       })
+      .sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''))
       .map((order) => ({
         ...order,
         total: toAmount(order.totalAmount),
@@ -303,10 +312,10 @@ export function useDashboard() {
         pickupDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : '',
         createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
       }));
-  }, [safeOrders]);
+  }, [safeOrders, referenceDate]);
 
   const enhancedMetrics = useMemo((): DashboardMetrics => {
-    const now = new Date();
+    const now = referenceDate;
     const startOfThisMonth = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
     const startOfLastMonth = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 

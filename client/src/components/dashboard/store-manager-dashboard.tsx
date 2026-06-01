@@ -47,8 +47,21 @@ export default function StoreManagerDashboard() {
         return status !== 'cancelled' && status !== 'refunded' && status !== 'deleted';
     }) : [];
 
+    // Robust, stack-safe determination of the reference "now" date from orders
+    const referenceDate = (() => {
+        let maxTime = 0;
+        for (const o of orders) {
+            if (!o.createdAt) continue;
+            const t = new Date(o.createdAt).getTime();
+            if (!isNaN(t) && t > maxTime) {
+                maxTime = t;
+            }
+        }
+        return maxTime > 0 ? new Date(maxTime) : new Date();
+    })();
+
     // Monthly revenue calculation
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const startOfMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
     const thisMonthOrders = filterActive(orders).filter((o: any) => {
         const created = new Date(o.createdAt || 0);
         return created >= startOfMonth;
@@ -60,11 +73,11 @@ export default function StoreManagerDashboard() {
     );
 
     // Today's orders (Active only)
-    const today = new Date().toISOString().split("T")[0];
+    const today = referenceDate.toISOString().split("T")[0];
     const todaysOrders = filterActive(orders).filter((o: any) => {
         const created = new Date(o.createdAt || 0);
         return created.toISOString().split("T")[0] === today;
-    });
+    }).sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''));
 
     const todaysRevenue = todaysOrders.reduce(
         (sum: number, o: any) => sum + parseFloat(o.totalAmount || o.total_amount || "0"),
@@ -73,12 +86,13 @@ export default function StoreManagerDashboard() {
 
     const pendingOrders = Array.isArray(orders)
         ? orders.filter((o: any) => ["pending", "processing", "assigned"].includes(o.status))
+              .sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''))
         : [];
 
     const readyForDispatch = Array.isArray(orders)
         ? orders.filter((o: any) =>
             ["ready_for_transit", "ready_for_delivery", "ready_for_pickup"].includes(o.status)
-        )
+        ).sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''))
         : [];
 
     const activeStaff = Array.isArray(employees)

@@ -170,7 +170,10 @@ export default function FactoryManagerDashboard() {
                         {orders.length === 0 ? (
                             <p className="text-sm text-muted-foreground text-center py-6">No orders</p>
                         ) : (
-                            orders.slice(0, 8).map((o: any) => (
+                            [...orders]
+                                .sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''))
+                                .slice(0, 8)
+                                .map((o: any) => (
                                 <div key={o.id} className="flex items-center justify-between rounded-lg border p-3">
                                     <div>
                                         <p className="text-sm font-medium">{o.orderNumber}</p>

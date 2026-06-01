@@ -75,36 +75,37 @@ const normalizeDate = (date: Date) => {
   return d;
 };
 
-const isOverdue = (pickupDate: string, status: string) => {
+const isOverdue = (pickupDate: string, status: string, todayDate?: Date) => {
   if (status === 'completed' || status === 'delivered' || status === 'cancelled') return false;
-  const today = normalizeDate(new Date());
+  const today = normalizeDate(todayDate || new Date());
   const pickup = normalizeDate(new Date(pickupDate));
   return pickup < today;
 };
 
-const isDueToday = (pickupDate: string) => {
-  const today = normalizeDate(new Date());
+const isDueToday = (pickupDate: string, todayDate?: Date) => {
+  const today = normalizeDate(todayDate || new Date());
   const pickup = normalizeDate(new Date(pickupDate));
   return pickup.getTime() === today.getTime();
 };
 
-const isDueTomorrow = (pickupDate: string) => {
-  const tomorrow = normalizeDate(new Date());
+const isDueTomorrow = (pickupDate: string, todayDate?: Date) => {
+  const today = normalizeDate(todayDate || new Date());
+  const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const pickup = normalizeDate(new Date(pickupDate));
   return pickup.getTime() === tomorrow.getTime();
 };
 
-const isUpcoming = (pickupDate: string, daysAhead: number = 7) => {
-  const today = normalizeDate(new Date());
-  const future = normalizeDate(new Date());
+const isUpcoming = (pickupDate: string, daysAhead: number = 7, todayDate?: Date) => {
+  const today = normalizeDate(todayDate || new Date());
+  const future = new Date(today);
   future.setDate(future.getDate() + daysAhead);
   const pickup = normalizeDate(new Date(pickupDate));
   return pickup > today && pickup <= future;
 };
 
-const getDaysUntilDue = (pickupDate: string) => {
-  const today = normalizeDate(new Date());
+const getDaysUntilDue = (pickupDate: string, todayDate?: Date) => {
+  const today = normalizeDate(todayDate || new Date());
   const pickup = normalizeDate(new Date(pickupDate));
   return Math.ceil((pickup.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
@@ -117,10 +118,29 @@ export default React.memo(function DueTodayOrders({
   showDateSelector = true,
   className
 }: DueTodayOrdersProps) {
+  // Robust, stack-safe determination of the reference "now" date from orders
+  const referenceDate = useMemo(() => {
+    let maxTime = 0;
+    for (const o of orders) {
+      if (!o.createdAt) continue;
+      const t = new Date(o.createdAt).getTime();
+      if (!isNaN(t) && t > maxTime) {
+        maxTime = t;
+      }
+    }
+    return maxTime > 0 ? new Date(maxTime) : new Date();
+  }, [orders]);
+
   const [activeTab, setActiveTab] = useState<string>("today");
   const [selectedDate, setSelectedDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return referenceDate.toISOString().split('T')[0];
   });
+
+  React.useEffect(() => {
+    if (referenceDate) {
+      setSelectedDate(referenceDate.toISOString().split('T')[0]);
+    }
+  }, [referenceDate]);
 
   // Categorize orders
   const categorizedOrders = useMemo(() => {
@@ -134,24 +154,25 @@ export default React.memo(function DueTodayOrders({
     orders.forEach(order => {
       if (!order.pickupDate) return;
 
-      if (isOverdue(order.pickupDate, order.status)) {
+      if (isOverdue(order.pickupDate, order.status, referenceDate)) {
         overdue.push(order);
-      } else if (isDueToday(order.pickupDate)) {
+      } else if (isDueToday(order.pickupDate, referenceDate)) {
         today.push(order);
-      } else if (isDueTomorrow(order.pickupDate)) {
+      } else if (isDueTomorrow(order.pickupDate, referenceDate)) {
         tomorrow.push(order);
-      } else if (isUpcoming(order.pickupDate, 7)) {
+      } else if (isUpcoming(order.pickupDate, 7, referenceDate)) {
         upcoming.push(order);
       }
     });
 
-    // Sort overdue by most overdue first
-    overdue.sort((a, b) => new Date(a.pickupDate).getTime() - new Date(b.pickupDate).getTime());
-    // Sort upcoming by nearest first
-    upcoming.sort((a, b) => new Date(a.pickupDate).getTime() - new Date(b.pickupDate).getTime());
+    // Sort overdue, today, tomorrow, upcoming by sequential orderNumber descending
+    overdue.sort((a, b) => (b.orderNumber || '').localeCompare(a.orderNumber || ''));
+    today.sort((a, b) => (b.orderNumber || '').localeCompare(a.orderNumber || ''));
+    tomorrow.sort((a, b) => (b.orderNumber || '').localeCompare(a.orderNumber || ''));
+    upcoming.sort((a, b) => (b.orderNumber || '').localeCompare(a.orderNumber || ''));
 
     return { overdue, today, tomorrow, upcoming };
-  }, [orders]);
+  }, [orders, referenceDate]);
 
   // Filter by specific date for calendar view
   const dateFilteredOrders = useMemo(() => {
@@ -161,7 +182,7 @@ export default React.memo(function DueTodayOrders({
       if (!order.pickupDate) return false;
       const pickup = normalizeDate(new Date(order.pickupDate));
       return pickup.getTime() === targetDate.getTime();
-    });
+    }).sort((a: any, b: any) => (b.orderNumber || '').localeCompare(a.orderNumber || ''));
   }, [orders, selectedDate]);
 
   const navigateDate = (direction: 'prev' | 'next') => {
@@ -184,8 +205,8 @@ export default React.memo(function DueTodayOrders({
   const displayOrders = getCurrentOrders().slice(0, limit);
 
   const renderOrderCard = (order: DueTodayOrder, index: number) => {
-    const daysUntil = getDaysUntilDue(order.pickupDate);
-    const isOverdueOrder = isOverdue(order.pickupDate, order.status);
+    const daysUntil = getDaysUntilDue(order.pickupDate, referenceDate);
+    const isOverdueOrder = isOverdue(order.pickupDate, order.status, referenceDate);
 
     return (
       <div
