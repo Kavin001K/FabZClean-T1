@@ -820,7 +820,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   background: panel,
                   border: `1px solid ${line}`,
                   borderRadius: '10px',
-                  padding: '10px 12px',
+                  padding: (isExpressOrder || isEditedInvoice) ? '112px 12px 10px' : '10px 12px',
                   position: 'relative',
                 }}
               >
@@ -828,8 +828,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   <div
                     style={{
                       position: 'absolute',
-                      right: '12px',
-                      top: '12px',
+                      left: '16px',
+                      top: '10px',
                       width: '92px',
                       height: '92px',
                       borderRadius: '50%',
@@ -838,8 +838,9 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transform: 'rotate(12deg)',
-                      opacity: 0.78,
+                      transform: 'rotate(-8deg)',
+                      opacity: 0.85,
+                      zIndex: 10,
                     }}
                   >
                     <div style={{ textAlign: 'center', color: '#c2410c', lineHeight: 1.1 }}>
@@ -853,15 +854,16 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   <div
                     style={{
                       position: 'absolute',
-                      right: isExpressOrder ? '12px' : '12px',
-                      top: isExpressOrder ? '110px' : '12px',
+                      right: '16px',
+                      top: '18px',
                       padding: '10px 12px',
                       borderRadius: '12px',
                       background: '#f5f3ff',
                       border: '1px solid #c4b5fd',
                       color: '#6d28d9',
-                      transform: 'rotate(5deg)',
+                      transform: 'rotate(6deg)',
                       opacity: 0.9,
+                      zIndex: 10,
                     }}
                   >
                     <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.16em' }}>EDITED</div>
