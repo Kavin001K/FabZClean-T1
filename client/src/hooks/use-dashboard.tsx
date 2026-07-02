@@ -75,13 +75,20 @@ export function useDashboard() {
     retry: 3,
   });
 
+  const dateFromParam = useMemo(() => {
+    const fromDate = filters.dateRange?.from || subDays(new Date(), 29);
+    const startOfLastMonth = startOfDay(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1));
+    const earliestDate = fromDate < startOfLastMonth ? fromDate : startOfLastMonth;
+    return earliestDate.toISOString();
+  }, [filters.dateRange?.from]);
+
   const {
     data: allOrders,
     isLoading: ordersLoading,
     error: ordersError,
   } = useQuery({
-    queryKey: ['dashboard/all-orders'],
-    queryFn: () => ordersApi.getAll(),
+    queryKey: ['dashboard/all-orders', dateFromParam],
+    queryFn: () => ordersApi.getAll({ dateFrom: dateFromParam }),
     staleTime: 2 * 60 * 1000,
     retry: 3,
   });
@@ -91,8 +98,8 @@ export function useDashboard() {
     isLoading: customersLoading,
     error: customersError,
   } = useQuery({
-    queryKey: ['dashboard/customers'],
-    queryFn: () => customersApi.getAll(),
+    queryKey: ['dashboard/customers', dateFromParam],
+    queryFn: () => customersApi.getAll({ dateFrom: dateFromParam, limit: 1000 }),
     staleTime: 5 * 60 * 1000,
     retry: 3,
   });
@@ -342,7 +349,7 @@ export function useDashboard() {
 
     const totalRevenue = activeFilteredOrders.reduce((sum, order) => sum + toAmount(order.totalAmount), 0);
     const totalOrders = activeFilteredOrders.length;
-    const outstandingCredit = safeCustomers.reduce((sum, customer) => sum + Math.max(0, toAmount(customer.creditBalance)), 0);
+    const outstandingCredit = dashboardMetrics?.outstandingCredit || 0;
     const completedOrders = activeFilteredOrders.filter((order) => COMPLETED_ORDER_STATUSES.includes(order.status)).length;
     const deliveredOrdersWithDueDates = activeFilteredOrders.filter((order) => order.deliveredAt && order.pickupDate);
     const onTimeDeliveries = deliveredOrdersWithDueDates.filter((order) =>
@@ -370,7 +377,7 @@ export function useDashboard() {
       customersGrowth: Number(customersGrowth.toFixed(1)),
       dueDateStats,
     };
-  }, [activeFilteredOrders, dashboardMetrics?.inventoryItems, dueDateStats, filteredCustomers.length, safeCustomers, safeOrders]);
+  }, [activeFilteredOrders, dashboardMetrics?.inventoryItems, dashboardMetrics?.outstandingCredit, dueDateStats, filteredCustomers.length, safeOrders]);
 
   const isLoading = useMemo(
     () => metricsLoading || ordersLoading || customersLoading,

@@ -1,0 +1,4 @@
+-- SQL Migration: Add Instant Order Fields
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type VARCHAR(50) DEFAULT 'normal';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS express_charge NUMERIC(10, 2) DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS instant_charge NUMERIC(10, 2) DEFAULT 0;

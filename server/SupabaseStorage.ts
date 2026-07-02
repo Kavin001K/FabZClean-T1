@@ -113,7 +113,7 @@ export class SupabaseStorage {
     }
 
     // Map DB snake_case to App camelCase
-    private mapDates(record: any): any {
+    public mapDates(record: any): any {
         if (!record) return record;
 
         const newRecord = { ...record };
@@ -781,6 +781,8 @@ export class SupabaseStorage {
             page?: number;
             sortBy?: string;
             sortOrder?: 'asc' | 'desc';
+            dateFrom?: string;
+            dateTo?: string;
         } = {}
     ): Promise<{ data: Customer[]; totalCount: number }> {
         let query = this.supabase.from('customers').select('*', { count: 'exact' });
@@ -828,6 +830,14 @@ export class SupabaseStorage {
         const phone = String(options.phone || '').trim();
         if (phone) {
             query = query.or(`phone.eq.${phone},secondary_phone.eq.${phone}`);
+        }
+
+        if (options.dateFrom) {
+            query = query.gte('created_at', options.dateFrom);
+        }
+
+        if (options.dateTo) {
+            query = query.lte('created_at', options.dateTo);
         }
 
         // Apply sorting

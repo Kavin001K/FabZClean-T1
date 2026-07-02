@@ -55,17 +55,56 @@ export default function AdminDashboard() {
     const effectiveFilterMode = isFilterActive ? filterMode : 'preset';
     const effectivePresetPeriod = isFilterActive ? presetPeriod : 'month';
 
+    const minDate = useMemo(() => {
+        const reference = new Date();
+        if (effectiveFilterMode === 'all') return undefined;
+        
+        if (effectiveFilterMode === 'preset') {
+            if (effectivePresetPeriod === 'day') {
+                return startOfDay(subDays(reference, 1));
+            } else if (effectivePresetPeriod === 'week') {
+                return startOfDay(subDays(reference, 13));
+            } else if (effectivePresetPeriod === 'fortnight') {
+                return startOfDay(subDays(reference, 27));
+            } else if (effectivePresetPeriod === 'month') {
+                return startOfMonth(subDays(reference, 30));
+            } else if (effectivePresetPeriod === 'quarter') {
+                return startOfQuarter(subDays(reference, 90));
+            } else if (effectivePresetPeriod === 'year') {
+                return startOfYear(subDays(reference, 365));
+            }
+        }
+        
+        if (effectiveFilterMode === 'date' && selectedDate) {
+            return startOfDay(subDays(selectedDate, 1));
+        }
+        
+        if (effectiveFilterMode === 'range' && rangeStart && rangeEnd) {
+            const start = startOfDay(rangeStart);
+            const end = endOfDay(rangeEnd);
+            const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+            return startOfDay(subDays(start, diffDays));
+        }
+        
+        return startOfMonth(subDays(reference, 30));
+    }, [effectiveFilterMode, effectivePresetPeriod, selectedDate, rangeStart, rangeEnd]);
+
+    const dateFromParam = minDate ? minDate.toISOString() : undefined;
+
     // Fetch all orders (single-tenant, no franchise filtering)
     const { data: orders = [], isLoading: isLoadingOrders, isError: ordersError, refetch: refetchOrders } = useQuery({
-        queryKey: ['admin-orders'],
-        queryFn: () => ordersApi.getAll(),
+        queryKey: ['admin-orders', dateFromParam],
+        queryFn: () => ordersApi.getAll(dateFromParam ? { dateFrom: dateFromParam } : {}),
         staleTime: 10000,
         refetchInterval: 15000,
     });
 
     const { data: customersResponse, isLoading: isLoadingCustomers, isError: customersError } = useQuery({
-        queryKey: ['admin-customers'],
-        queryFn: () => customersApi.getAll({ limit: 1000 }),
+        queryKey: ['admin-customers', dateFromParam],
+        queryFn: () => customersApi.getAll({ 
+            limit: 1000, 
+            ...(dateFromParam ? { dateFrom: dateFromParam } : {}) 
+        }),
         staleTime: 10000,
     });
     const customersList = useMemo(() => customersResponse?.data || [], [customersResponse]);

@@ -220,8 +220,81 @@ const findOrdersRelatedToCustomer = (customer: Customer, orders: Order[]) => {
     .sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
 };
 
+async function getCustomerCandidateOrders(customer: Customer): Promise<Order[]> {
+  const supabase = (storage as any).supabase;
+  if (!supabase) {
+    return await storage.listOrders();
+  }
+
+  const queries: Promise<any>[] = [];
+
+  if (customer.id) {
+    queries.push(
+      supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_id', customer.id)
+    );
+  }
+
+  if (customer.email) {
+    queries.push(
+      supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_email', customer.email)
+    );
+  }
+
+  const primaryPhone = normalizePhone(customer.phone);
+  if (primaryPhone) {
+    queries.push(
+      supabase
+        .from('orders')
+        .select('*')
+        .or(`customer_phone.eq.${primaryPhone},secondary_phone.eq.${primaryPhone}`)
+    );
+  }
+
+  const secondaryPhone = normalizePhone((customer as any).secondaryPhone);
+  if (secondaryPhone) {
+    queries.push(
+      supabase
+        .from('orders')
+        .select('*')
+        .or(`customer_phone.eq.${secondaryPhone},secondary_phone.eq.${secondaryPhone}`)
+    );
+  }
+
+  if (queries.length === 0) {
+    return [];
+  }
+
+  try {
+    const results = await Promise.all(queries);
+    const orderMap = new Map<string, Order>();
+
+    for (const response of results) {
+      if (response.error) {
+        console.error('[Recovery] getCustomerCandidateOrders Query Error:', response.error);
+        continue;
+      }
+      const data = response.data || [];
+      for (const rawOrder of data) {
+        const mapped = storage.mapDates(rawOrder);
+        orderMap.set(mapped.id, mapped);
+      }
+    }
+
+    return Array.from(orderMap.values());
+  } catch (error) {
+    console.error('[Recovery] Failed to fetch candidate orders:', error);
+    return await storage.listOrders();
+  }
+}
+
 async function ensureCustomerHasRecoveredPhone(customer: Customer, candidateOrders?: Order[]): Promise<RecoveredCustomerContact> {
-  const matchedOrders = findOrdersRelatedToCustomer(customer, candidateOrders || await storage.listOrders());
+  const matchedOrders = findOrdersRelatedToCustomer(customer, candidateOrders || await getCustomerCandidateOrders(customer));
 
   const currentPrimary = normalizePhone(customer.phone);
   const currentSecondary = normalizePhone((customer as any).secondaryPhone);
@@ -373,11 +446,28 @@ router.get('/autocomplete', async (req, res) => {
     let hydratedResults = results;
     const customersNeedingRecovery = results.filter((customer: Customer) => !customer.phone);
     if (customersNeedingRecovery.length > 0) {
-      const allOrders = await storage.listOrders();
+      const supabase = (storage as any).supabase;
+      let candidateOrders: Order[] = [];
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .in('customer_id', customersNeedingRecovery.map(c => c.id));
+        if (error) {
+          console.error('[Recovery] Autocomplete Batch Orders Fetch Error:', error);
+          candidateOrders = await storage.listOrders();
+        } else {
+          candidateOrders = (data || []).map((o: any) => storage.mapDates(o));
+        }
+      } else {
+        candidateOrders = await storage.listOrders();
+      }
+
       const recoveredById = new Map<string, Customer>();
 
       await Promise.all(customersNeedingRecovery.map(async (customer: Customer) => {
-        const recovered = await ensureCustomerHasRecoveredPhone(customer, allOrders);
+        const customerCandidates = candidateOrders.filter(o => o.customerId === customer.id);
+        const recovered = await ensureCustomerHasRecoveredPhone(customer, customerCandidates);
         recoveredById.set(customer.id, recovered.customer);
       }));
 
@@ -402,7 +492,9 @@ router.get('/', async (req, res) => {
       phone,
       segment,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
+      dateFrom,
+      dateTo
     } = req.query;
 
     // Use database-level filtering for search-heavy paths to avoid loading the
@@ -420,17 +512,36 @@ router.get('/', async (req, res) => {
       sortBy: typeof sortBy === 'string' ? sortBy : undefined,
       sortOrder: sortOrder === 'asc' ? 'asc' : 'desc',
       page: pageNum,
-      limit: limitNum
-    });
+      limit: limitNum,
+      dateFrom: typeof dateFrom === 'string' && dateFrom.trim() ? dateFrom.trim() : undefined,
+      dateTo: typeof dateTo === 'string' && dateTo.trim() ? dateTo.trim() : undefined,
+    } as any);
 
     let hydratedCustomers = customers;
     const customersNeedingRecovery = customers.filter((customer: Customer) => !customer.phone);
     if (customersNeedingRecovery.length > 0) {
-      const allOrders = await storage.listOrders();
+      const supabase = (storage as any).supabase;
+      let candidateOrders: Order[] = [];
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .in('customer_id', customersNeedingRecovery.map(c => c.id));
+        if (error) {
+          console.error('[Recovery] GET / Batch Orders Fetch Error:', error);
+          candidateOrders = await storage.listOrders();
+        } else {
+          candidateOrders = (data || []).map((o: any) => storage.mapDates(o));
+        }
+      } else {
+        candidateOrders = await storage.listOrders();
+      }
+
       const recoveredById = new Map<string, Customer>();
 
       await Promise.all(customersNeedingRecovery.map(async (customer: Customer) => {
-        const recovered = await ensureCustomerHasRecoveredPhone(customer, allOrders);
+        const customerCandidates = candidateOrders.filter(o => o.customerId === customer.id);
+        const recovered = await ensureCustomerHasRecoveredPhone(customer, customerCandidates);
         recoveredById.set(customer.id, recovered.customer);
       }));
 
@@ -487,8 +598,20 @@ router.get('/:id/profile', async (req, res) => {
       return res.status(404).json(createErrorResponse('Customer not found', 404));
     }
 
-    const allOrders = await storage.listOrders();
-    const { customer, matchedOrders } = await ensureCustomerHasRecoveredPhone(customerRecord, allOrders);
+    const supabase = (storage as any).supabase;
+    let candidateOrders: Order[] = [];
+    if (supabase) {
+      const { data, error } = await supabase.from('orders').select('*').eq('customer_id', customerRecord.id);
+      if (error) {
+        console.error('[Profile] Orders Fetch Error:', error);
+        candidateOrders = await storage.listOrders();
+      } else {
+        candidateOrders = (data || []).map((o: any) => storage.mapDates(o));
+      }
+    } else {
+      candidateOrders = await storage.listOrders();
+    }
+    const { customer, matchedOrders } = await ensureCustomerHasRecoveredPhone(customerRecord, candidateOrders);
     const customerPhonesForBookingLookup = [
       normalizePhone(customer.phone),
       normalizePhone((customer as any).secondaryPhone),
@@ -503,7 +626,6 @@ router.get('/:id/profile', async (req, res) => {
       matchedOrders.map((order: Order) => [order.id, order] as const)
     );
 
-    const supabase = (storage as any).supabase;
     let feedbackHistory: CustomerFeedbackSummary[] = [];
     let globalRatings: number[] = [];
 
@@ -1120,25 +1242,13 @@ router.get('/:id/orders', async (req, res) => {
   try {
     const customerId = req.params.id;
     const { limit = 20, status } = req.query;
-
-    const orders = await storage.listOrders();
-    let customerOrders = orders.filter((order: Order) => order.customerId === customerId);
-
-    // Apply status filter
-    if (status && status !== 'all') {
-      customerOrders = customerOrders.filter((order: Order) => order.status === status);
-    }
-
-    // Sort by creation date (newest first)
-    customerOrders.sort((a: Order, b: Order) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
-
-    // Apply limit
     const limitNum = parseInt(limit as string) || 20;
-    customerOrders = customerOrders.slice(0, limitNum);
+
+    const customerOrders = await storage.listOrders(undefined, {
+      customerId,
+      status: status && status !== 'all' ? (status as string) : undefined,
+      limit: limitNum,
+    });
 
     // Serialize orders
     const serializedOrders = customerOrders.map((order: Order) => ({
