@@ -1,9 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import {
     Users,
     IndianRupee,
@@ -51,6 +55,7 @@ export default function AdminDashboard() {
     const [rangeEnd, setRangeEnd] = useState<Date | undefined>(undefined);
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [rangeStep, setRangeStep] = useState<'start' | 'end'>('start');
+    const [activeDetailsDialog, setActiveDetailsDialog] = useState<'revenue' | 'orders' | 'customers' | 'today-revenue' | null>(null);
 
     const effectiveFilterMode = isFilterActive ? filterMode : 'preset';
     const effectivePresetPeriod = isFilterActive ? presetPeriod : 'month';
@@ -412,6 +417,102 @@ export default function AdminDashboard() {
             }));
     }, [filteredOrders]);
 
+    const paymentBreakdown = useMemo(() => {
+        let cash = 0;
+        let upi = 0;
+        let wallet = 0;
+        let credit = 0;
+        filteredOrders.forEach((o: any) => {
+            const status = String(o.status || '').toLowerCase();
+            if (status === 'cancelled' || status === 'refunded' || status === 'deleted') return;
+            const pm = String(o.paymentMethod || o.payment_method || '').toLowerCase();
+            const total = parseFloat(o.totalAmount || o.total_amount || 0);
+            
+            const wUsed = parseFloat(o.walletUsed || o.wallet_used || 0);
+            const cUsed = parseFloat(o.creditUsed || o.credit_used || 0);
+            
+            wallet += wUsed;
+            credit += cUsed;
+            
+            const cashOrUpiApplied = total - wUsed - cUsed;
+            if (cashOrUpiApplied > 0) {
+                if (pm === 'upi') {
+                    upi += cashOrUpiApplied;
+                } else {
+                    cash += cashOrUpiApplied;
+                }
+            }
+        });
+        return { cash, upi, wallet, credit };
+    }, [filteredOrders]);
+
+    const delayedOrders = useMemo(() => {
+        return filteredOrders.filter((o: any) => {
+            if (!o.pickupDate) return false;
+            const expectedTime = new Date(o.pickupDate).getTime();
+            const status = String(o.status || '').toLowerCase();
+            const isReadyState = ['completed', 'delivered', 'ready_for_pickup', 'ready_for_delivery'].includes(status);
+            
+            if (isReadyState) {
+                const readyTimeStr = (o.statusTimestamps as any)?.ready_for_pickup || (o.statusTimestamps as any)?.ready_for_delivery || o.deliveredAt || o.updatedAt || o.createdAt;
+                const readyTime = new Date(readyTimeStr).getTime();
+                return readyTime > expectedTime;
+            } else if (status !== 'cancelled' && status !== 'refunded' && status !== 'deleted') {
+                const nowTime = now.getTime();
+                return nowTime > expectedTime;
+            }
+            return false;
+        });
+    }, [filteredOrders, now]);
+
+    const newCustomersList = useMemo(() => {
+        if (effectiveFilterMode === 'all') return customersList;
+        
+        let start: Date | null = null;
+        let end: Date | null = null;
+        const todayStart = startOfDay(now);
+        const todayEnd = endOfDay(now);
+        
+        if (effectiveFilterMode === 'preset') {
+            start = todayStart;
+            if (effectivePresetPeriod === 'week') {
+                start = startOfDay(subDays(now, 6));
+            } else if (effectivePresetPeriod === 'fortnight') {
+                start = startOfDay(subDays(now, 13));
+            } else if (effectivePresetPeriod === 'month') {
+                start = startOfMonth(now);
+            } else if (effectivePresetPeriod === 'quarter') {
+                start = startOfQuarter(now);
+            } else if (effectivePresetPeriod === 'year') {
+                start = startOfYear(now);
+            }
+            end = todayEnd;
+        } else if (effectiveFilterMode === 'date' && selectedDate) {
+            start = startOfDay(selectedDate);
+            end = endOfDay(selectedDate);
+        } else if (effectiveFilterMode === 'range' && rangeStart && rangeEnd) {
+            start = startOfDay(rangeStart);
+            end = endOfDay(rangeEnd);
+        }
+        
+        if (!start || !end) return customersList;
+        
+        return customersList.filter((c: any) => {
+            if (!c.createdAt) return false;
+            const d = new Date(c.createdAt);
+            return d >= start! && d <= end!;
+        });
+    }, [customersList, now, effectiveFilterMode, effectivePresetPeriod, selectedDate, rangeStart, rangeEnd]);
+
+    const todayOrders = useMemo(() => {
+        const startOfToday = startOfDay(now);
+        return orders.filter((o: any) => {
+            const status = String(o.status || '').toLowerCase();
+            if (status === 'cancelled' || status === 'refunded' || status === 'deleted') return false;
+            return new Date(o.createdAt || now) >= startOfToday;
+        });
+    }, [orders, now]);
+
     const filterLabel = useMemo(() => {
         if (filterMode === 'preset') {
             const selected = PERIOD_FILTERS.find((option) => option.value === presetPeriod);
@@ -482,15 +583,6 @@ export default function AdminDashboard() {
             label: stats.newCustomersLabel,
             comparisonValue: String(stats.comparisonNewCustomers),
             icon: UserPlus,
-        },
-        {
-            title: 'On-time Readiness',
-            value: `${stats.readinessRate}%`,
-            growth: stats.readinessRate,
-            label: 'avg delay',
-            comparisonValue: stats.avgDelayStr,
-            icon: Clock,
-            isReadinessCard: true
         }
     ];
 
@@ -638,7 +730,15 @@ export default function AdminDashboard() {
                 {statCards.map((card) => {
                     const Icon = card.icon;
                     return (
-                        <Card key={card.title} className="group border-border bg-card shadow-sm rounded-2xl transition-all hover:shadow-md hover:border-border/80">
+                        <Card 
+                            key={card.title} 
+                            className="group border-border bg-card shadow-sm rounded-2xl transition-all hover:shadow-md hover:border-border/80 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                            onClick={() => {
+                                if (card.title === 'Revenue') setActiveDetailsDialog('revenue');
+                                else if (card.title === 'Orders') setActiveDetailsDialog('orders');
+                                else if (card.title === 'New Customers') setActiveDetailsDialog('customers');
+                            }}
+                        >
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                                 <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{card.title}</CardTitle>
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground group-hover:text-primary transition-colors">
@@ -648,20 +748,7 @@ export default function AdminDashboard() {
                             <CardContent>
                                 <div className="truncate text-3xl font-black text-foreground tracking-tight">{card.value}</div>
                                 <div className="mt-3 flex min-h-5 items-center">
-                                    {card.isReadinessCard ? (
-                                        <div className={cn(
-                                            "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all",
-                                            stats.readinessRate >= 90 
-                                                ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20" 
-                                                : stats.readinessRate >= 75 
-                                                    ? "bg-amber-500/10 text-amber-600 dark:bg-amber-500/20" 
-                                                    : "bg-red-500/10 text-red-600 dark:bg-red-500/20"
-                                        )}>
-                                            <Clock className="h-3.5 w-3.5" />
-                                            <span>Avg Delay: {stats.avgDelayStr}</span>
-                                            <span className="text-muted-foreground/60 font-medium ml-1">({stats.delayedCount} delayed)</span>
-                                        </div>
-                                    ) : card.growth !== null ? (
+                                    {card.growth !== null ? (
                                         <div className={cn(
                                             "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all",
                                             card.growth > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"
@@ -684,7 +771,10 @@ export default function AdminDashboard() {
                 })}
 
                 {/* Today's Revenue Widget — always visible */}
-                <Card className="group border-emerald-200 dark:border-emerald-800/30 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/10 dark:to-card shadow-sm overflow-hidden rounded-2xl transition-all hover:shadow-md">
+                <Card 
+                    className="group border-emerald-200 dark:border-emerald-800/30 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/10 dark:to-card shadow-sm overflow-hidden rounded-2xl transition-all hover:shadow-md cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                    onClick={() => setActiveDetailsDialog('today-revenue')}
+                >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                         <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Today's Revenue</CardTitle>
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
@@ -753,6 +843,308 @@ export default function AdminDashboard() {
                     <WeatherWidget />
                 </div>
             </div>
+
+            {/* On-Time Operational Readiness Chart & Analysis */}
+            <Card className="border-border bg-card shadow-sm rounded-2xl p-6">
+                <CardHeader className="pb-3 border-b border-border/50">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-primary" />
+                        Operational On-Time Readiness
+                    </CardTitle>
+                    <CardDescription>
+                        Detailed analysis of expected vs actual delivery time for the selected period ({filterLabel}).
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                        {/* Donut Chart */}
+                        <div className="md:col-span-5 flex flex-col items-center justify-center relative min-h-[220px]">
+                            {stats.totalEvaluated === 0 ? (
+                                <div className="text-sm text-muted-foreground py-10">No orders evaluated in this period.</div>
+                            ) : (
+                                <>
+                                    <ResponsiveContainer width="100%" height={200}>
+                                        <PieChart>
+                                            <Pie
+                                                data={[
+                                                    { name: 'On-Time', value: stats.onTimeCount, color: '#10b981' },
+                                                    { name: 'Delayed', value: stats.delayedCount, color: '#ef4444' }
+                                                ]}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={4}
+                                                dataKey="value"
+                                            >
+                                                <Cell fill="#10b981" />
+                                                <Cell fill="#ef4444" />
+                                            </Pie>
+                                            <Tooltip 
+                                                formatter={(value) => [`${value} order(s)`, 'Count']}
+                                                contentStyle={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: '#1e293b', color: '#fff' }}
+                                            />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div className="absolute flex flex-col items-center justify-center">
+                                        <span className="text-3xl font-black text-foreground">{stats.readinessRate}%</span>
+                                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Readiness</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Metrics & Details */}
+                        <div className="md:col-span-7 space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 rounded-xl border bg-muted/30">
+                                    <div className="text-xs text-muted-foreground uppercase font-bold">On-Time Deliveries</div>
+                                    <div className="text-2xl font-black text-emerald-500 mt-1">{stats.onTimeCount}</div>
+                                    <div className="text-[10px] text-muted-foreground/60 mt-1">Ready by expected date</div>
+                                </div>
+                                <div className="p-4 rounded-xl border bg-muted/30">
+                                    <div className="text-xs text-muted-foreground uppercase font-bold">Delayed Orders</div>
+                                    <div className="text-2xl font-black text-red-500 mt-1">{stats.delayedCount}</div>
+                                    <div className="text-[10px] text-muted-foreground/60 mt-1">Exceeded expected date</div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-bold text-foreground">Interactive Analysis Details</h3>
+                                <ul className="space-y-2 text-xs">
+                                    <li className="flex justify-between items-center py-1.5 border-b border-border/40">
+                                        <span className="text-muted-foreground">Total Evaluated Orders:</span>
+                                        <span className="font-semibold text-foreground">{stats.totalEvaluated}</span>
+                                    </li>
+                                    <li className="flex justify-between items-center py-1.5 border-b border-border/40">
+                                        <span className="text-muted-foreground">Average Delay Duration:</span>
+                                        <span className="font-semibold text-foreground">{stats.avgDelayStr}</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            {/* Delayed Orders List */}
+                            {delayedOrders.length > 0 && (
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-sm font-bold text-foreground">Overdue / Delayed Orders List</h3>
+                                        <Badge variant="outline" className="text-red-500 bg-red-500/5 border-red-500/20 font-bold">{delayedOrders.length} total</Badge>
+                                    </div>
+                                    <ScrollArea className="h-[120px] rounded-xl border border-border/60 p-2">
+                                        <div className="space-y-2">
+                                            {delayedOrders.map((o: any) => {
+                                                const expected = new Date(o.pickupDate).getTime();
+                                                const readyTimeStr = (o.statusTimestamps as any)?.ready_for_pickup || (o.statusTimestamps as any)?.ready_for_delivery || o.deliveredAt || o.updatedAt || o.createdAt;
+                                                const actual = new Date(readyTimeStr).getTime();
+                                                const diff = actual - expected;
+                                                const delayHours = diff > 0 ? Math.round(diff / (1000 * 60 * 60)) : 0;
+                                                const delayStr = delayHours >= 24 ? `${Math.round(delayHours / 24)}d` : `${delayHours}h`;
+
+                                                return (
+                                                    <div key={o.id} className="flex justify-between items-center p-2 rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors text-xs">
+                                                        <div>
+                                                            <span className="font-bold text-primary hover:underline cursor-pointer" onClick={() => window.location.href = `/orders?id=${o.id}`}>{o.orderNumber}</span>
+                                                            <span className="text-muted-foreground ml-2">({o.customerName})</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant="secondary" className="text-[10px] uppercase font-bold">{o.status}</Badge>
+                                                            <Badge variant="destructive" className="text-[10px] font-bold">+{delayStr} delay</Badge>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </ScrollArea>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Interactive Details Dialog */}
+            <Dialog open={activeDetailsDialog !== null} onOpenChange={(open) => !open && setActiveDetailsDialog(null)}>
+                <DialogContent className="max-w-2xl bg-card border-border rounded-2xl shadow-2xl p-6">
+                    <DialogHeader className="pb-3 border-b border-border/50">
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
+                            {activeDetailsDialog === 'revenue' && <IndianRupee className="h-5 w-5 text-emerald-500" />}
+                            {activeDetailsDialog === 'orders' && <ShoppingBag className="h-5 w-5 text-blue-500" />}
+                            {activeDetailsDialog === 'customers' && <UserPlus className="h-5 w-5 text-indigo-500" />}
+                            {activeDetailsDialog === 'today-revenue' && <TrendingUp className="h-5 w-5 text-emerald-500" />}
+                            <span>
+                                {activeDetailsDialog === 'revenue' && 'Revenue Breakdown'}
+                                {activeDetailsDialog === 'orders' && 'Orders Listing'}
+                                {activeDetailsDialog === 'customers' && 'New Registrations'}
+                                {activeDetailsDialog === 'today-revenue' && "Today's Sales & Orders"}
+                            </span>
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground mt-1">
+                            Showing details for the selected period: <span className="font-bold text-foreground">{filterLabel}</span>
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {activeDetailsDialog === 'revenue' && (
+                        <div className="space-y-6 pt-4">
+                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                                <div className="p-4 rounded-xl border bg-muted/20">
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Cash Share</div>
+                                    <div className="text-lg font-black text-foreground mt-1">{formatCurrency(paymentBreakdown.cash)}</div>
+                                </div>
+                                <div className="p-4 rounded-xl border bg-muted/20">
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">UPI Share</div>
+                                    <div className="text-lg font-black text-foreground mt-1">{formatCurrency(paymentBreakdown.upi)}</div>
+                                </div>
+                                <div className="p-4 rounded-xl border bg-muted/20">
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Wallet Share</div>
+                                    <div className="text-lg font-black text-foreground mt-1">{formatCurrency(paymentBreakdown.wallet)}</div>
+                                </div>
+                                <div className="p-4 rounded-xl border bg-muted/20">
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Credit Share</div>
+                                    <div className="text-lg font-black text-foreground mt-1">{formatCurrency(paymentBreakdown.credit)}</div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-bold text-foreground">Top Orders by Value in this Period</h3>
+                                <ScrollArea className="h-[250px] rounded-xl border p-2">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Order #</TableHead>
+                                                <TableHead>Customer</TableHead>
+                                                <TableHead>Method</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">Total</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredOrders
+                                                .filter(o => o.status !== 'cancelled' && o.status !== 'refunded')
+                                                .sort((a, b) => parseFloat(b.totalAmount || 0) - parseFloat(a.totalAmount || 0))
+                                                .slice(0, 20)
+                                                .map((o: any) => (
+                                                    <TableRow key={o.id}>
+                                                        <TableCell className="font-bold text-primary hover:underline cursor-pointer" onClick={() => window.location.href = `/orders?id=${o.id}`}>{o.orderNumber}</TableCell>
+                                                        <TableCell>{o.customerName || 'Unknown'}</TableCell>
+                                                        <TableCell className="uppercase text-[10px] font-bold">{o.paymentMethod || o.payment_method || 'CASH'}</TableCell>
+                                                        <TableCell className="capitalize text-[10px] font-bold">{o.status}</TableCell>
+                                                        <TableCell className="text-right font-bold text-emerald-500">{formatCurrency(o.totalAmount)}</TableCell>
+                                                    </TableRow>
+                                                ))
+                                            }
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeDetailsDialog === 'orders' && (
+                        <div className="space-y-4 pt-4">
+                            <h3 className="text-sm font-bold text-foreground">Total Orders in Period: {filteredOrders.length}</h3>
+                            <ScrollArea className="h-[320px] rounded-xl border p-2">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Order #</TableHead>
+                                            <TableHead>Customer</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Total</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredOrders.map((o: any) => (
+                                            <TableRow key={o.id}>
+                                                <TableCell className="font-bold text-primary hover:underline cursor-pointer" onClick={() => window.location.href = `/orders?id=${o.id}`}>{o.orderNumber}</TableCell>
+                                                <TableCell>{o.customerName || 'Unknown'}</TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">{o.createdAt ? format(new Date(o.createdAt), 'dd MMM yyyy HH:mm') : 'N/A'}</TableCell>
+                                                <TableCell className="capitalize text-[10px] font-bold">{o.status}</TableCell>
+                                                <TableCell className="text-right font-bold text-emerald-500">{formatCurrency(o.totalAmount)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </div>
+                    )}
+
+                    {activeDetailsDialog === 'customers' && (
+                        <div className="space-y-4 pt-4">
+                            <h3 className="text-sm font-bold text-foreground">New Registrations: {newCustomersList.length}</h3>
+                            <ScrollArea className="h-[320px] rounded-xl border p-2">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Phone</TableHead>
+                                            <TableHead>Registered Date</TableHead>
+                                            <TableHead className="text-right">Total Spent</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {newCustomersList.map((c: any) => (
+                                            <TableRow key={c.id}>
+                                                <TableCell className="font-bold">{c.name}</TableCell>
+                                                <TableCell className="font-mono text-xs">{c.phone}</TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">{c.createdAt ? format(new Date(c.createdAt), 'dd MMM yyyy') : 'N/A'}</TableCell>
+                                                <TableCell className="text-right font-bold text-emerald-500">{formatCurrency(c.totalSpent || c.total_spent)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </div>
+                    )}
+
+                    {activeDetailsDialog === 'today-revenue' && (
+                        <div className="space-y-6 pt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 rounded-xl border bg-muted/20">
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Today's Revenue</div>
+                                    <div className="text-2xl font-black text-emerald-500 mt-1">{formatCurrency(stats.todayRevenue)}</div>
+                                </div>
+                                <div className="p-4 rounded-xl border bg-muted/20">
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Today's Orders</div>
+                                    <div className="text-2xl font-black text-primary mt-1">{stats.todayOrderCount}</div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-bold text-foreground">Today's Order List</h3>
+                                <ScrollArea className="h-[250px] rounded-xl border p-2">
+                                    {todayOrders.length === 0 ? (
+                                        <div className="text-center py-10 text-xs text-muted-foreground">No orders placed today yet.</div>
+                                    ) : (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Order #</TableHead>
+                                                    <TableHead>Customer</TableHead>
+                                                    <TableHead>Time</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                    <TableHead className="text-right">Total</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {todayOrders.map((o: any) => (
+                                                    <TableRow key={o.id}>
+                                                        <TableCell className="font-bold text-primary hover:underline cursor-pointer" onClick={() => window.location.href = `/orders?id=${o.id}`}>{o.orderNumber}</TableCell>
+                                                        <TableCell>{o.customerName || 'Unknown'}</TableCell>
+                                                        <TableCell className="text-xs text-muted-foreground">{o.createdAt ? format(new Date(o.createdAt), 'HH:mm') : 'N/A'}</TableCell>
+                                                        <TableCell className="capitalize text-[10px] font-bold">{o.status}</TableCell>
+                                                        <TableCell className="text-right font-bold text-emerald-500">{formatCurrency(o.totalAmount)}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    )}
+                                </ScrollArea>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

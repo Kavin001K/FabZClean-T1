@@ -1140,7 +1140,8 @@ router.put('/:id', async (req, res) => {
         // Auto-refund logic
         const advancePaid = parseAmount((order as any).advancePaid);
         const walletUsed = parseAmount((order as any).walletUsed);
-        const totalPaid = advancePaid + walletUsed;
+        const creditUsed = parseAmount((order as any).creditUsed || (order as any).credit_used);
+        const totalPaid = advancePaid + walletUsed + creditUsed;
 
         if (totalPaid > 0 && order.customerId) {
             try {
@@ -1471,7 +1472,8 @@ router.patch(
       if (status === 'cancelled') {
           const advancePaid = parseAmount((order as any).advancePaid);
           const walletUsed = parseAmount((order as any).walletUsed);
-          const totalPaid = advancePaid + walletUsed;
+          const creditUsed = parseAmount((order as any).creditUsed || (order as any).credit_used);
+          const totalPaid = advancePaid + walletUsed + creditUsed;
 
           if (totalPaid > 0 && order.customerId) {
               try {
