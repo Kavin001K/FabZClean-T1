@@ -309,6 +309,48 @@ export default function AdminDashboard() {
 
         const newCustomersGrowth = getGrowth(newCustomersThisPeriod, newCustomersCompPeriod);
 
+        // Calculate Operational On-time Readiness
+        let totalEvaluated = 0;
+        let totalOnTime = 0;
+        let totalDelayed = 0;
+        let totalDelayMs = 0;
+
+        for (const o of filteredOrders) {
+            if (!o.pickupDate) continue;
+            
+            const expectedTime = new Date(o.pickupDate).getTime();
+            const status = String(o.status || '').toLowerCase();
+            const isReadyState = ['completed', 'delivered', 'ready_for_pickup', 'ready_for_delivery'].includes(status);
+            
+            if (isReadyState) {
+                // Find actual ready time
+                const readyTimeStr = (o.statusTimestamps as any)?.ready_for_pickup || (o.statusTimestamps as any)?.ready_for_delivery || o.deliveredAt || o.updatedAt || o.createdAt;
+                const readyTime = new Date(readyTimeStr).getTime();
+                
+                totalEvaluated++;
+                if (readyTime <= expectedTime) {
+                    totalOnTime++;
+                } else {
+                    totalDelayed++;
+                    totalDelayMs += (readyTime - expectedTime);
+                }
+            } else if (status !== 'cancelled' && status !== 'refunded' && status !== 'deleted') {
+                // Overdue pending/processing orders
+                const nowTime = now.getTime();
+                if (nowTime > expectedTime) {
+                    totalEvaluated++;
+                    totalDelayed++;
+                    totalDelayMs += (nowTime - expectedTime);
+                }
+            }
+        }
+
+        const readinessRate = totalEvaluated > 0 ? Math.round((totalOnTime / totalEvaluated) * 100) : 100;
+        const avgDelayHours = totalDelayed > 0 ? Math.round(totalDelayMs / (1000 * 60 * 60 * totalDelayed)) : 0;
+        const avgDelayStr = avgDelayHours >= 24 
+            ? `${Math.round(avgDelayHours / 24)}d` 
+            : `${avgDelayHours}h`;
+
         return {
             totalRevenue: periodRevenue,
             revenueGrowth: effectiveFilterMode === 'all' ? null : parseFloat(revenueGrowth.toFixed(1)),
@@ -329,6 +371,11 @@ export default function AdminDashboard() {
             todayOrderCount,
             todayRevenueGrowth: parseFloat(todayRevenueGrowth.toFixed(1)),
             lastMonthSameDayRevenue,
+            readinessRate,
+            avgDelayStr,
+            onTimeCount: totalOnTime,
+            delayedCount: totalDelayed,
+            totalEvaluated
         };
     }, [orders, now, customersList, effectiveFilterMode, effectivePresetPeriod, selectedDate, rangeStart, rangeEnd]);
 
@@ -436,6 +483,15 @@ export default function AdminDashboard() {
             comparisonValue: String(stats.comparisonNewCustomers),
             icon: UserPlus,
         },
+        {
+            title: 'On-time Readiness',
+            value: `${stats.readinessRate}%`,
+            growth: stats.readinessRate,
+            label: 'avg delay',
+            comparisonValue: stats.avgDelayStr,
+            icon: Clock,
+            isReadinessCard: true
+        }
     ];
 
     return (
@@ -592,7 +648,20 @@ export default function AdminDashboard() {
                             <CardContent>
                                 <div className="truncate text-3xl font-black text-foreground tracking-tight">{card.value}</div>
                                 <div className="mt-3 flex min-h-5 items-center">
-                                    {card.growth !== null ? (
+                                    {card.isReadinessCard ? (
+                                        <div className={cn(
+                                            "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all",
+                                            stats.readinessRate >= 90 
+                                                ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20" 
+                                                : stats.readinessRate >= 75 
+                                                    ? "bg-amber-500/10 text-amber-600 dark:bg-amber-500/20" 
+                                                    : "bg-red-500/10 text-red-600 dark:bg-red-500/20"
+                                        )}>
+                                            <Clock className="h-3.5 w-3.5" />
+                                            <span>Avg Delay: {stats.avgDelayStr}</span>
+                                            <span className="text-muted-foreground/60 font-medium ml-1">({stats.delayedCount} delayed)</span>
+                                        </div>
+                                    ) : card.growth !== null ? (
                                         <div className={cn(
                                             "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all",
                                             card.growth > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"

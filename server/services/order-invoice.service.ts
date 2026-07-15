@@ -7,6 +7,7 @@ import { LocalStorage } from './local-storage';
 import { R2Storage } from './r2-storage';
 import { businessConfigService } from './business-config-service';
 import { sendInvoiceWhatsAppBatch } from './whatsapp.service';
+import { sendOrderInvoiceEmail } from './smtp-email.service';
 import { smartItemSummary } from '../utils/item-summarizer';
 import {
   DEFAULT_INVOICE_TEMPLATE_CONFIG,
@@ -900,6 +901,26 @@ export async function processOrderBillingPipeline(orderId: string, retryCount = 
       lastWhatsappSentAt: new Date(),
       whatsappMessageCount: currentCount + 1,
     } as any);
+
+    // Send invoice email asynchronously if customer email exists
+    if (generated.order.customerEmail) {
+      setImmediate(async () => {
+        try {
+          await sendOrderInvoiceEmail({
+            orderNumber: generated.order.orderNumber,
+            customerName: generated.order.customerName,
+            customerEmail: generated.order.customerEmail,
+            totalAmount: generated.order.totalAmount,
+            paymentStatus: generated.order.paymentStatus || 'pending',
+            paymentMethod: generated.order.paymentMethod || 'cash',
+            invoiceUrl: generated.invoiceUrl,
+            items: (generated.order.items as any[]) || [],
+          });
+        } catch (emailError) {
+          console.warn(`[Order Invoice Email] Non-blocking background send failed for order ${generated.order.orderNumber}:`, emailError);
+        }
+      });
+    }
 
     return {
       success: true,

@@ -56,7 +56,7 @@ router.get('/apply-indexes', async (req, res) => {
         const connectionString = 
             process.env.DATABASE_URL || 
             process.env.SUPABASE_DB_URL || 
-            (process.env.SUPABASE_URL ? process.env.SUPABASE_URL.replace('https://', 'postgresql://postgres:').replace('.supabase.co', '.supabase.co:5432/postgres') : null);
+            (process.env.SUPABASE_URL ? process.env.SUPABASE_URL.replace('https://', 'postgresql://postgres@').replace('.supabase.co', '.supabase.co:5432/postgres') : null);
 
         if (!connectionString) {
             return res.status(500).json({ error: 'No database connection string found in environment.' });
@@ -70,6 +70,12 @@ router.get('/apply-indexes', async (req, res) => {
         await client.connect();
 
         const sql = `
+            -- Table schema migrations
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_type VARCHAR(50) DEFAULT 'normal';
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS express_charge DECIMAL(10, 2) DEFAULT 0;
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS instant_charge DECIMAL(10, 2) DEFAULT 0;
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS status_timestamps JSONB DEFAULT '{}'::jsonb;
+
             CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
             CREATE INDEX IF NOT EXISTS idx_customers_name_trgm ON public.customers USING gin (name gin_trgm_ops);

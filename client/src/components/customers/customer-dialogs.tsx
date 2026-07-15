@@ -79,7 +79,7 @@ const customerFormSchema = z.object({
       message: 'Secondary phone must be exactly 10 digits (without country code/prefix)',
     }).optional().nullable(),
   // Separate address fields for clean data collection
-  addressStreet: z.string().min(1, 'Street address is required'),
+  addressStreet: z.string().optional(),
   addressCity: z.string().optional(),
   addressPincode: z.string().refine((val) => !val || /^\d{6}$/.test(val.replace(/\s/g, '')), {
     message: 'Pincode must be 6 digits',
@@ -577,9 +577,18 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       <TableBody>
                         {customerOrders.length > 0 ? (
                           customerOrders.map((order) => {
-                            const serviceNames = Array.isArray(order.items)
-                              ? (order.items as any[]).map(item => item.productName || item.serviceName || 'Service').slice(0, 2)
-                              : ['Services'];
+                            let itemsArray: any[] = [];
+                            if (Array.isArray(order.items)) {
+                              itemsArray = order.items;
+                            } else if (typeof order.items === 'string') {
+                              try {
+                                itemsArray = JSON.parse(order.items);
+                              } catch (e) {
+                                itemsArray = [];
+                              }
+                            }
+                            const serviceNames = itemsArray.map(item => item.productName || item.serviceName || item.name || 'Service').slice(0, 2);
+                            if (serviceNames.length === 0) serviceNames.push('Services');
 
                             return (
                               <TableRow key={order.id}>
@@ -596,8 +605,8 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                                         {service}
                                       </Badge>
                                     ))}
-                                    {Array.isArray(order.items) && (order.items as any[]).length > 2 && (
-                                      <Badge variant="outline" className="text-xs">+{(order.items as any[]).length - 2}</Badge>
+                                    {itemsArray.length > 2 && (
+                                      <Badge variant="outline" className="text-xs">+{itemsArray.length - 2}</Badge>
                                     )}
                                   </div>
                                 </TableCell>

@@ -260,9 +260,7 @@ function OrdersComponent() {
     refetch,
   } = useQuery({
     queryKey: ['/api/orders'],
-    queryFn: () => ordersApi.getAll({ 
-      limit: 10000
-    }),
+    queryFn: () => ordersApi.getAll(),
     staleTime: 30000,
     refetchOnWindowFocus: true,
     retry: 3,
@@ -1065,70 +1063,246 @@ function OrdersComponent() {
     }
   }, [selectedOrders, queryClient, toast]);
 
-  const handleExportCSV = useCallback(() => {
-    if (filteredOrders.length === 0) {
-      toast({
-        title: "No Data to Export",
-        description: "There are no orders to export.",
-        variant: "destructive",
-      });
-      return;
-    }
-    exportOrdersToCSV(filteredOrders);
+  const fetchAllOrdersForExport = useCallback(async (currentFilters?: OrderFilters): Promise<Order[]> => {
     toast({
-      title: "Export Started",
-      description: `Exporting ${filteredOrders.length} orders to CSV...`,
+      title: "Fetching Export Data",
+      description: "Downloading matching orders from database, please wait...",
     });
-  }, [filteredOrders, toast]);
 
-  const handleExportPDF = useCallback(() => {
-    if (filteredOrders.length === 0) {
-      toast({
-        title: "No Data to Export",
-        description: "There are no orders to export.",
-        variant: "destructive",
-      });
-      return;
+    let allOrdersList: Order[] = [];
+    let currentPage = 1;
+    let hasMore = true;
+    const fetchLimit = 500;
+
+    // Map status array to query parameter if exactly one status is selected
+    const statusParam = currentFilters?.status && currentFilters.status.length === 1 
+      ? currentFilters.status[0] 
+      : undefined;
+
+    try {
+      while (hasMore) {
+        const queryParams: any = {
+          page: currentPage,
+          limit: fetchLimit,
+        };
+
+        if (currentFilters) {
+          if (currentFilters.search) queryParams.search = currentFilters.search;
+          if (statusParam) queryParams.status = statusParam;
+          if (currentFilters.dateFrom) queryParams.dateFrom = currentFilters.dateFrom.toISOString();
+          if (currentFilters.dateTo) queryParams.dateTo = currentFilters.dateTo.toISOString();
+        }
+
+        const response = await ordersApi.getAll(queryParams);
+
+        if (response && response.length > 0) {
+          allOrdersList = [...allOrdersList, ...response];
+          if (response.length < fetchLimit) {
+            hasMore = false;
+          } else {
+            currentPage++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      return allOrdersList;
+    } catch (error) {
+      console.error("Error fetching all orders for export:", error);
+      throw error;
     }
-    exportOrdersEnhanced(filteredOrders);
-    toast({
-      title: "PDF Export Started",
-      description: `Generating enhanced PDF for ${filteredOrders.length} orders...`,
-    });
-  }, [filteredOrders, toast]);
+  }, [toast]);
 
-  const handleExportExcel = useCallback(() => {
-    if (filteredOrders.length === 0) {
-      toast({
-        title: "No Data to Export",
-        description: "There are no orders to export.",
-        variant: "destructive",
+  const getFilteredOrdersList = useCallback((allOrders: Order[]) => {
+    const searchLower = filters.search?.toLowerCase();
+    const hasStatusFilter = filters.status.length > 0;
+    const hasPaymentFilter = filters.paymentStatus.length > 0;
+    const minAmount = filters.amountMin ? safeParseFloat(filters.amountMin) : null;
+    const maxAmount = filters.amountMax ? safeParseFloat(filters.amountMax) : null;
+
+    const filtered = allOrders.filter(order => {
+      // Search filter
+      if (searchLower) {
+        const matchesSearch =
+          order.id.toLowerCase().includes(searchLower) ||
+          order.customerName.toLowerCase().includes(searchLower) ||
+          order.orderNumber.toLowerCase().includes(searchLower) ||
+          (order as any).customerPhone?.toLowerCase().includes(searchLower) ||
+          (order as any).service?.toLowerCase().includes(searchLower) ||
+          getOrderStoreLabel(resolveOrderStoreCodeFromOrder(order)).toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+
+      // Status filter
+      if (hasStatusFilter && !filters.status.includes(order.status)) {
+        return false;
+      }
+
+      // Payment status filter
+      if (hasPaymentFilter) {
+        const paymentStatus = (order as any).paymentStatus || 'pending';
+        if (!filters.paymentStatus.includes(paymentStatus)) {
+          return false;
+        }
+      }
+
+      // Date range filter
+      if (filters.dateFrom || filters.dateTo) {
+        const orderDate = new Date(order.createdAt || new Date());
+        const orderDateStr = orderDate.toISOString();
+        if (filters.dateFrom && new Date(orderDateStr) < filters.dateFrom) return false;
+        if (filters.dateTo && new Date(orderDateStr) > filters.dateTo) return false;
+      }
+
+      // Due date filter
+      if (filters.dueDate) {
+        const dueDate = resolveOrderDueDate(order);
+        if (!dueDate || !isSameDay(dueDate, filters.dueDate)) {
+          return false;
+        }
+      }
+
+      // Amount range filter
+      const orderAmount = safeParseFloat(order.totalAmount);
+      if (minAmount !== null && !isNaN(minAmount) && orderAmount < minAmount) return false;
+      if (maxAmount !== null && !isNaN(maxAmount) && orderAmount > maxAmount) return false;
+
+      return true;
+    });
+
+    // Apply sorting
+    if (sortField) {
+      filtered.sort((a, b) => {
+        const aValue = (a as any)[sortField];
+        const bValue = (b as any)[sortField];
+
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          return sortDirection === 'asc'
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+        }
+
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+        }
+
+        // Handle dates
+        if (aValue instanceof Date && bValue instanceof Date) {
+          return sortDirection === 'asc'
+            ? aValue.getTime() - bValue.getTime()
+            : bValue.getTime() - aValue.getTime();
+        }
+
+        // Handle date strings
+        const aDate = new Date(aValue as any);
+        const bDate = new Date(bValue as any);
+        if (!isNaN(aDate.getTime()) && !isNaN(bDate.getTime())) {
+          return sortDirection === 'asc'
+            ? aDate.getTime() - bDate.getTime()
+            : bDate.getTime() - aDate.getTime();
+        }
+
+        return 0;
       });
-      return;
     }
 
-    const filterInfo = {
-      status: filters.status,
-      paymentStatus: filters.paymentStatus,
-      dateRange: filters.dateFrom || filters.dateTo
-        ? `${filters.dateFrom ? formatDate(filters.dateFrom.toISOString()) : 'Any'} - ${filters.dateTo ? formatDate(filters.dateTo.toISOString()) : 'Any'}`
-        : undefined,
-      dueDate: filters.dueDate
-        ? filters.dueDatePreset === 'today'
-          ? 'Today'
-          : format(filters.dueDate, "PPP")
-        : undefined,
-      amountRange: filters.amountMin || filters.amountMax
-        ? `${filters.amountMin || 'Any'} - ${filters.amountMax || 'Any'}`
-        : undefined,
-    };
+    return filtered;
+  }, [filters, sortField, sortDirection]);
 
-    exportOrdersToExcel(filteredOrders, filterInfo);
-    toast({
-      title: "Excel Export Successful",
-      description: `Exported ${filteredOrders.length} orders to Excel.`,
-    });
-  }, [filteredOrders, filters, toast]);
+  const handleExportCSV = useCallback(async () => {
+    try {
+      const allOrders = await fetchAllOrdersForExport(filters);
+      const filtered = getFilteredOrdersList(allOrders);
+      if (filtered.length === 0) {
+        toast({
+          title: "No Data to Export",
+          description: "There are no orders to export.",
+          variant: "destructive",
+        });
+        return;
+      }
+      exportOrdersToCSV(filtered);
+      toast({
+        title: "Export Successful",
+        description: `Exported all ${filtered.length} matching orders to CSV.`,
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: "Could not retrieve all orders. Please try again.",
+      });
+    }
+  }, [fetchAllOrdersForExport, getFilteredOrdersList, filters, toast]);
+
+  const handleExportPDF = useCallback(async () => {
+    try {
+      const allOrders = await fetchAllOrdersForExport(filters);
+      const filtered = getFilteredOrdersList(allOrders);
+      if (filtered.length === 0) {
+        toast({
+          title: "No Data to Export",
+          description: "There are no orders to export.",
+          variant: "destructive",
+        });
+        return;
+      }
+      exportOrdersEnhanced(filtered);
+      toast({
+        title: "PDF Export Started",
+        description: `Generating enhanced PDF for all ${filtered.length} matching orders...`,
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: "Could not retrieve all orders. Please try again.",
+      });
+    }
+  }, [fetchAllOrdersForExport, getFilteredOrdersList, filters, toast]);
+
+  const handleExportExcel = useCallback(async () => {
+    try {
+      const allOrders = await fetchAllOrdersForExport(filters);
+      const filtered = getFilteredOrdersList(allOrders);
+      if (filtered.length === 0) {
+        toast({
+          title: "No Data to Export",
+          description: "There are no orders to export.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const filterInfo = {
+        status: filters.status,
+        paymentStatus: filters.paymentStatus,
+        dateRange: filters.dateFrom || filters.dateTo
+          ? `${filters.dateFrom ? formatDate(filters.dateFrom.toISOString()) : 'Any'} - ${filters.dateTo ? formatDate(filters.dateTo.toISOString()) : 'Any'}`
+          : undefined,
+        dueDate: filters.dueDate
+          ? filters.dueDatePreset === 'today'
+            ? 'Today'
+            : format(filters.dueDate, "PPP")
+          : undefined,
+        amountRange: filters.amountMin || filters.amountMax
+          ? `${filters.amountMin || 'Any'} - ${filters.amountMax || 'Any'}`
+          : undefined,
+      };
+
+      exportOrdersToExcel(filtered, filterInfo);
+      toast({
+        title: "Excel Export Successful",
+        description: `Exported all ${filtered.length} matching orders to Excel.`,
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: "Could not retrieve all orders. Please try again.",
+      });
+    }
+  }, [fetchAllOrdersForExport, getFilteredOrdersList, filters, toast]);
 
   const handleExportSelected = useCallback(() => {
     if (selectedOrders.length === 0) {

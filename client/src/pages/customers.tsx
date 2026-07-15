@@ -114,6 +114,12 @@ export default function Customers() {
   const [segmentFilter, setSegmentFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
   
+  // CRM & Intelligence Dashboard states
+  const [viewMode, setViewMode] = useState<'directory' | 'crm'>('directory');
+  const [crmTab, setCrmTab] = useState<'top100' | 'active' | 'recent' | 'sales' | 'timeline'>('top100');
+  const [activeDays, setActiveDays] = useState<number>(30);
+  const [recentMonthOffset, setRecentMonthOffset] = useState<number>(0);
+  
   // Pagination state: cap 'All' to 1000 (Supabase max-rows safe limit)
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(1000); // Default to 'All' (capped at 1000)
@@ -239,6 +245,435 @@ export default function Customers() {
     staleTime: 60000,
     refetchOnWindowFocus: true,
   });
+
+  // Fetch all customers for CRM analytics (caches all customers when switching to CRM view)
+  const { data: allCustomers = [], isLoading: allCustomersLoading } = useQuery({
+    queryKey: ['all-customers-crm'],
+    queryFn: async () => {
+      let allList: Customer[] = [];
+      let currentPage = 1;
+      let hasMore = true;
+      const fetchLimit = 1000;
+      
+      while (hasMore) {
+        const response = await customersApi.getAll({
+          page: currentPage,
+          limit: fetchLimit
+        });
+        if (response && response.data && response.data.length > 0) {
+          allList = [...allList, ...response.data];
+          if (response.data.length < fetchLimit || allList.length >= response.totalCount) {
+            hasMore = false;
+          } else {
+            currentPage++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      return allList;
+    },
+    enabled: viewMode === 'crm',
+    staleTime: 60000,
+  });
+
+  // Onboarding limit check/warning
+  const customerCountWarning = null;
+
+  // Top 100 customers by total spent
+  const top100Customers = useMemo(() => {
+    return [...allCustomers]
+      .sort((a, b) => safeParseFloat(b.totalSpent) - safeParseFloat(a.totalSpent))
+      .slice(0, 100);
+  }, [allCustomers]);
+
+  // Active customers - placed at least 1 order in the last X days
+  const activeCustomersList = useMemo(() => {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - activeDays);
+    
+    const activeCustomerIds = new Set(
+      orders
+        .filter(o => o.createdAt && new Date(o.createdAt) >= cutoffDate && o.status !== 'cancelled')
+        .map(o => o.customerId)
+    );
+    
+    return allCustomers.filter(c => activeCustomerIds.has(c.id));
+  }, [allCustomers, orders, activeDays]);
+
+  // Recent Customers View: only last 2–3 months of customers, with month filters.
+  // We handle month boundary date checks timezone-safely
+  const recentCustomersList = useMemo(() => {
+    const now = new Date();
+    // month offset: 0 = current month, 1 = last month, 2 = 2 months ago
+    const targetMonthDate = new Date(now.getFullYear(), now.getMonth() - recentMonthOffset, 1);
+    const targetYear = targetMonthDate.getFullYear();
+    const targetMonth = targetMonthDate.getMonth();
+    
+    const startOfMonth = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0);
+    const endOfMonth = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
+    
+    return allCustomers.filter(c => {
+      if (!c.createdAt) return false;
+      const createdDate = new Date(c.createdAt);
+      return createdDate >= startOfMonth && createdDate <= endOfMonth;
+    });
+  }, [allCustomers, recentMonthOffset]);
+
+  // Meaningful Recent Update Timeline
+  const { data: auditLogs = [] } = useQuery({
+    queryKey: ['audit-logs-crm-tab'],
+    queryFn: async () => {
+      const response = await fetch('/api/audit-logs?limit=100');
+      if (!response.ok) throw new Error('Failed to fetch audit logs');
+      const data = await response.json();
+      return data?.data || [];
+    },
+    enabled: viewMode === 'crm' && crmTab === 'timeline',
+    staleTime: 30000,
+  });
+
+  const timelineUpdates = useMemo(() => {
+    return auditLogs
+      .filter((log: any) => ['create_customer', 'update_customer', 'delete_customer'].includes(log.action))
+      .map((log: any) => ({
+        id: log.id,
+        action: log.action,
+        timestamp: log.createdAt,
+        operator: log.employeeName || 'System',
+        description: log.description || 'Customer profile was modified',
+        details: typeof log.details === 'string' ? JSON.parse(log.details) : (log.details || {}),
+      }));
+  }, [auditLogs]);
+
+  const renderTop100 = () => {
+    return (
+      <Card className="glass border-muted">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold">Top 100 High-Value Customers</CardTitle>
+          <CardDescription>Ranked by lifetime revenue contribution.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {top100Customers.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No customer records found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 text-muted-foreground text-xs font-bold uppercase select-none">
+                    <th className="py-3 px-4">Rank</th>
+                    <th className="py-3 px-4">Customer</th>
+                    <th className="py-3 px-4">Phone / Email</th>
+                    <th className="py-3 px-4 text-right">Orders</th>
+                    <th className="py-3 px-4 text-right">AOV</th>
+                    <th className="py-3 px-4 text-right">Total Spent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {top100Customers.map((c, index) => {
+                    const spent = safeParseFloat(c.totalSpent);
+                    const ordersCount = c.totalOrders || 0;
+                    const aov = ordersCount > 0 ? spent / ordersCount : 0;
+                    return (
+                      <tr 
+                        key={c.id} 
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setIsViewDialogOpen(true);
+                        }}
+                        className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <td className="py-4 px-4 font-mono font-bold text-muted-foreground">#{index + 1}</td>
+                        <td className="py-4 px-4 font-semibold text-foreground">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-7 w-7 text-[10px] font-bold bg-primary/10 border border-primary/20 text-primary">
+                              <AvatarFallback>{c.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            {c.name}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-xs font-medium text-foreground">{c.phone}</div>
+                          {c.email && <div className="text-[10px] text-muted-foreground">{c.email}</div>}
+                        </td>
+                        <td className="py-4 px-4 text-right font-semibold">{ordersCount}</td>
+                        <td className="py-4 px-4 text-right font-medium text-muted-foreground">Rs. {aov.toFixed(1)}</td>
+                        <td className="py-4 px-4 text-right font-bold text-emerald-500">Rs. {spent.toLocaleString('en-IN')}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderActive = () => {
+    return (
+      <Card className="glass border-muted">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold">Active Customer Base ({activeDays} Days)</CardTitle>
+          <CardDescription>Customers with successful orders in this period.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {activeCustomersList.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No customers were active in the last {activeDays} days.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeCustomersList.map((c) => {
+                const spent = safeParseFloat(c.totalSpent);
+                const activeOrders = orders.filter(o => o.customerId === c.id && o.status !== 'cancelled');
+                const lastActiveOrder = activeOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0];
+                
+                return (
+                  <Card 
+                    key={c.id}
+                    onClick={() => {
+                      setSelectedCustomer(c);
+                      setIsViewDialogOpen(true);
+                    }}
+                    className="glass border-muted hover:border-primary/20 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8 text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
+                            <AvatarFallback>{c.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="text-sm font-bold text-foreground">{c.name}</h4>
+                            <p className="text-[10px] text-muted-foreground">{c.phone}</p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] font-bold text-emerald-500 border-emerald-500/20 bg-emerald-500/5">
+                          Active
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs border-t border-b border-white/5 py-2">
+                        <div>
+                          <span className="text-muted-foreground block text-[9px] uppercase font-bold">Recent Orders</span>
+                          <span className="font-bold text-foreground">{activeOrders.length} orders</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[9px] uppercase font-bold">Total Spent</span>
+                          <span className="font-bold text-foreground text-emerald-500">Rs. {spent.toFixed(0)}</span>
+                        </div>
+                      </div>
+
+                      {lastActiveOrder && (
+                        <div className="text-[10px] text-muted-foreground flex justify-between items-center">
+                          <span>Last Order: <span className="font-bold text-foreground">{lastActiveOrder.orderNumber}</span></span>
+                          <span>{new Date(lastActiveOrder.createdAt || '').toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderRecent = () => {
+    return (
+      <Card className="glass border-muted">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold">Recent Customers Cohort</CardTitle>
+          <CardDescription>Customers registered in the selected calendar month.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {recentCustomersList.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No customers onboarded during this month.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 text-muted-foreground text-xs font-bold uppercase select-none">
+                    <th className="py-3 px-4">Customer</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Register Date</th>
+                    <th className="py-3 px-4 text-right">Spent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentCustomersList.map((c) => {
+                    const spent = safeParseFloat(c.totalSpent);
+                    return (
+                      <tr 
+                        key={c.id} 
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setIsViewDialogOpen(true);
+                        }}
+                        className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <td className="py-4 px-4 font-semibold text-foreground">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-7 w-7 text-[10px] font-bold bg-primary/10 border border-primary/20 text-primary">
+                              <AvatarFallback>{c.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            {c.name}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 font-mono text-xs text-muted-foreground">{c.email || 'N/A'}</td>
+                        <td className="py-4 px-4">
+                          <Badge variant={c.status === 'active' ? 'default' : 'outline'} className="text-[10px] font-bold">
+                            {c.status}
+                          </Badge>
+                        </td>
+                        <td className="py-4 px-4 text-xs font-medium">
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          }) : 'N/A'}
+                        </td>
+                        <td className="py-4 px-4 text-right font-bold text-emerald-500">Rs. {spent.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderSales = () => {
+    const maxSpent = top100Customers.length > 0 ? safeParseFloat(top100Customers[0].totalSpent) : 1;
+    
+    return (
+      <Card className="glass border-muted">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold">Sales & Customer Revenue Share</CardTitle>
+          <CardDescription>Analysis of client contribution to overall sales.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {top100Customers.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No sales records found.</div>
+          ) : (
+            <div className="space-y-4">
+              {top100Customers.slice(0, 10).map((c) => {
+                const spent = safeParseFloat(c.totalSpent);
+                const percentOfMax = (spent / maxSpent) * 100;
+                const customerOrders = orders.filter(o => o.customerId === c.id);
+                const activeOrders = customerOrders.filter(o => o.status !== 'cancelled');
+                
+                return (
+                  <div key={c.id} className="space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground hover:underline cursor-pointer" onClick={() => {
+                          setSelectedCustomer(c);
+                          setIsViewDialogOpen(true);
+                        }}>{c.name}</span>
+                        <span className="text-xs text-muted-foreground font-mono">({c.phone})</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-emerald-500 mr-2">Rs. {spent.toLocaleString('en-IN')}</span>
+                        <span className="text-xs text-muted-foreground font-bold">({activeOrders.length} orders)</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-white/5 h-2.5 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${percentOfMax}%` }} 
+                      />
+                    </div>
+                    {activeOrders.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1 pl-2">
+                        {activeOrders.slice(0, 4).map(o => (
+                          <Badge 
+                            key={o.id}
+                            variant="outline"
+                            onClick={() => {
+                              window.location.href = `/orders?id=${o.id}`;
+                            }}
+                            className="text-[9px] font-mono cursor-pointer hover:bg-white/5 hover:text-foreground transition-all gap-1 py-0 px-1.5"
+                          >
+                            {o.orderNumber} (Rs. {Number(o.totalAmount || 0).toFixed(0)})
+                          </Badge>
+                        ))}
+                        {activeOrders.length > 4 && (
+                          <span className="text-[9px] text-muted-foreground font-medium">+{activeOrders.length - 4} more</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderTimeline = () => {
+    return (
+      <Card className="glass border-muted">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold">Customer Update & Audit Log</CardTitle>
+          <CardDescription>Chronological timeline of meaningful modifications.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {timelineUpdates.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No recent modifications found.</div>
+          ) : (
+            <div className="relative pl-6 border-l border-white/10 space-y-6 py-2">
+              {timelineUpdates.map((update) => {
+                const isCreation = update.action === 'create_customer';
+                const isDeletion = update.action === 'delete_customer';
+                
+                return (
+                  <div key={update.id} className="relative group">
+                    <div className={`absolute -left-[31px] top-1 h-3.5 w-3.5 rounded-full border-2 border-background transition-colors ${
+                      isCreation 
+                        ? 'bg-blue-500 group-hover:bg-blue-400' 
+                        : isDeletion
+                          ? 'bg-red-500 group-hover:bg-red-400'
+                          : 'bg-amber-500 group-hover:bg-amber-400'
+                    }`} />
+                    
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className="font-bold text-sm text-foreground">
+                          {isCreation ? 'Customer Registered' : isDeletion ? 'Customer Deleted' : 'Profile Updated'}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {new Date(update.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                        {update.description}
+                      </p>
+                      
+                      <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                        <span>Operator:</span>
+                        <span className="text-foreground">{update.operator}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   // Computed metrics
   const metrics = useMemo(() => {
@@ -688,9 +1123,36 @@ export default function Customers() {
           </div>
         </FadeIn>
 
-        {/* Search and Filter Bar */}
-        <FadeIn delay={0.3}>
-          <Card className="glass mb-8 overflow-hidden border-muted">
+        {/* View Switcher Tabs */}
+        <div className="flex border-b border-white/10 mb-8 mt-2">
+          <button
+            onClick={() => setViewMode('directory')}
+            className={`px-6 py-3 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${
+              viewMode === 'directory'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            Customer Directory
+          </button>
+          <button
+            onClick={() => setViewMode('crm')}
+            className={`px-6 py-3 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${
+              viewMode === 'crm'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <TrendingUp className="h-4 w-4" />
+            CRM & Intelligence
+          </button>
+        </div>
+
+        {viewMode === 'directory' ? (
+          <>
+            <FadeIn delay={0.3}>
+            <Card className="glass mb-8 overflow-hidden border-muted">
             <CardContent className="p-4 sm:p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="relative flex-1 lg:max-w-xl group">
@@ -1038,6 +1500,109 @@ export default function Customers() {
             </div>
           )}
         </FadeIn>
+      </>
+    ) : (
+        <FadeIn delay={0.3}>
+          {/* Limit Warning banner if any */}
+          {customerCountWarning && (
+            <div className={`mb-6 p-4 rounded-xl border flex items-center justify-between gap-4 ${
+              customerCountWarning.severity === 'destructive'
+                ? 'bg-red-500/10 border-red-500/20 text-red-500'
+                : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-current animate-pulse" />
+                <p className="text-sm font-semibold">{customerCountWarning.message}</p>
+              </div>
+              <Badge variant={customerCountWarning.severity === 'destructive' ? 'destructive' : 'secondary'}>
+                Subscription Limit: 130
+              </Badge>
+            </div>
+          )}
+
+          {/* CRM Sub-Navigation */}
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-muted/10 p-2 rounded-2xl border border-white/5 mb-8">
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: 'top100', label: 'Top 100 Customers', icon: Award },
+                { id: 'active', label: 'Active Status', icon: Users },
+                { id: 'recent', label: 'Recent Cohort', icon: Calendar },
+                { id: 'sales', label: 'Sales Performance', icon: TrendingUp },
+                { id: 'timeline', label: 'Update Timeline', icon: Clock },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <Button
+                    key={tab.id}
+                    onClick={() => setCrmTab(tab.id as any)}
+                    variant={crmTab === tab.id ? 'default' : 'ghost'}
+                    className="h-10 rounded-xl px-4 gap-2 font-bold text-xs transition-all"
+                  >
+                    <Icon className="h-4 w-4" />
+                    {tab.label}
+                  </Button>
+                );
+              })}
+            </div>
+
+            {/* Sub-tab controls */}
+            {crmTab === 'active' && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-semibold">Active in:</span>
+                <Select value={String(activeDays)} onValueChange={(val) => setActiveDays(Number(val))}>
+                  <SelectTrigger className="w-[120px] h-9 rounded-lg border-white/5 bg-background">
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="60">Last 60 days</SelectItem>
+                    <SelectItem value="90">Last 90 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {crmTab === 'recent' && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-semibold">Joined in:</span>
+                <Select value={String(recentMonthOffset)} onValueChange={(val) => setRecentMonthOffset(Number(val))}>
+                  <SelectTrigger className="w-[150px] h-9 rounded-lg border-white/5 bg-background">
+                    <SelectValue placeholder="Select month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 3 }).map((_, offset) => {
+                      const date = new Date();
+                      date.setMonth(date.getMonth() - offset);
+                      const label = date.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+                      return (
+                        <SelectItem key={offset} value={String(offset)}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* Sub-Tab content */}
+          {allCustomersLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
+              <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              <p className="text-sm text-muted-foreground font-medium">Crunching customer analytics...</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {crmTab === 'top100' && renderTop100()}
+              {crmTab === 'active' && renderActive()}
+              {crmTab === 'recent' && renderRecent()}
+              {crmTab === 'sales' && renderSales()}
+              {crmTab === 'timeline' && renderTimeline()}
+            </div>
+          )}
+        </FadeIn>
+      )}
 
         {/* Customer Dialogs */}
       <CustomerDialogs
@@ -1057,7 +1622,7 @@ export default function Customers() {
       />
 
       {/* Pagination Controls */}
-      {!customersLoading && filteredCustomers.length > 0 && (
+      {viewMode === 'directory' && !customersLoading && filteredCustomers.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pb-12">
           <p className="text-sm text-muted-foreground order-2 sm:order-1">
             Showing <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}</span> to{' '}

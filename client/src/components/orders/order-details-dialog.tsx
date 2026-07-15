@@ -271,62 +271,91 @@ export default React.memo(function OrderDetailsDialog({
             {/* Dates & Quick Stats Column */}
             <div className="bg-white dark:bg-slate-900/60 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={cn(
-                    "h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner",
-                    ['completed', 'delivered'].includes(order.status)
-                      ? "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
-                      : "bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400"
-                  )}>
-                    {['completed', 'delivered'].includes(order.status)
-                      ? <CheckCircle className="h-6 w-6" />
-                      : <Calendar className="h-6 w-6" />
-                    }
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                      {['completed', 'delivered'].includes(order.status) ? 'Delivered On' : 'Expected Delivery'}
-                    </p>
-                    <p className="font-black text-2xl tracking-tight text-slate-900 dark:text-white leading-tight">
-                      {['completed', 'delivered'].includes(order.status)
-                        ? formatDate(anyOrder.deliveredAt || anyOrder.updatedAt || anyOrder.pickupDate)
-                        : anyOrder.pickupDate
-                          ? formatDate(anyOrder.pickupDate)
-                          : 'Not Scheduled'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-wrap gap-2">
-                  {['completed', 'delivered'].includes(order.status) ? (
-                    <Badge className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2 bg-emerald-50 text-emerald-700 border-emerald-200">
-                      <CheckCircle className="h-3 w-3 mr-1.5" />
-                      Fulfilled
-                    </Badge>
-                  ) : anyOrder.pickupDate ? (
-                    <Badge className={cn(
-                      "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2",
-                      new Date(anyOrder.pickupDate) < new Date()
-                        ? "bg-rose-50 text-rose-700 border-rose-200 shadow-sm shadow-rose-100"
-                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    )}>
-                      {new Date(anyOrder.pickupDate) < new Date()
-                        ? "Overdue Alert"
-                        : "On Schedule"}
-                    </Badge>
-                  ) : null}
-                  <Badge variant="outline" className="font-black border-slate-900 bg-slate-900 text-white dark:bg-slate-800 dark:border-slate-700 text-[10px] uppercase tracking-widest px-3 py-1 rounded-lg">
-                    {storeLabel}
-                  </Badge>
-                </div>
+                {(() => {
+                  const status = order.status;
+                  const expectedDate = anyOrder.pickupDate ? formatDate(anyOrder.pickupDate) : 'Not Scheduled';
+                  let label = 'Expected Delivery';
+                  let dateValue = expectedDate;
+                  let showExpected = false;
+                  let colorClass = 'text-amber-600 dark:text-amber-400';
+                  let bgClass = 'bg-amber-100 dark:bg-amber-950/30';
+                  let iconElement = <Calendar className="h-6 w-6" />;
 
-                {/* Show expected delivery as secondary info when order is delivered */}
-                {['completed', 'delivered'].includes(order.status) && anyOrder.pickupDate && (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <Calendar className="h-3.5 w-3.5" />
-                    <span>Expected by {formatDate(anyOrder.pickupDate)}</span>
-                  </div>
-                )}
+                  if (['completed', 'delivered'].includes(status)) {
+                    const actualDate = formatDate(anyOrder.deliveredAt || anyOrder.statusTimestamps?.completed || anyOrder.statusTimestamps?.delivered || anyOrder.updatedAt || anyOrder.pickupDate);
+                    label = 'Delivered On';
+                    dateValue = actualDate;
+                    showExpected = true;
+                    colorClass = 'text-emerald-600 dark:text-emerald-400';
+                    bgClass = 'bg-emerald-100 dark:bg-emerald-950/30';
+                    iconElement = <CheckCircle className="h-6 w-6" />;
+                  } else if (['ready_for_pickup', 'ready_for_delivery'].includes(status)) {
+                    const readyDate = formatDate(anyOrder.statusTimestamps?.ready_for_pickup || anyOrder.statusTimestamps?.ready_for_delivery || anyOrder.updatedAt || anyOrder.pickupDate);
+                    label = status === 'ready_for_pickup' ? 'Ready for Pickup' : 'Ready for Delivery';
+                    dateValue = readyDate;
+                    showExpected = true;
+                    colorClass = 'text-blue-600 dark:text-blue-400';
+                    bgClass = 'bg-blue-100 dark:bg-blue-950/30';
+                    iconElement = <CheckCircle className="h-6 w-6" />;
+                  }
+
+                  return (
+                    <>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className={cn(
+                          "h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner",
+                          colorClass,
+                          bgClass
+                        )}>
+                          {iconElement}
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                            {label}
+                          </p>
+                          <p className="font-black text-2xl tracking-tight text-slate-900 dark:text-white leading-tight">
+                            {dateValue}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {['completed', 'delivered'].includes(order.status) ? (
+                          <Badge className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2 bg-emerald-50 text-emerald-700 border-emerald-200">
+                            <CheckCircle className="h-3 w-3 mr-1.5" />
+                            Fulfilled
+                          </Badge>
+                        ) : ['ready_for_pickup', 'ready_for_delivery'].includes(order.status) ? (
+                          <Badge className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2 bg-blue-50 text-blue-700 border-blue-200">
+                            <CheckCircle className="h-3 w-3 mr-1.5" />
+                            Ready
+                          </Badge>
+                        ) : anyOrder.pickupDate ? (
+                          <Badge className={cn(
+                            "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2",
+                            new Date(anyOrder.pickupDate) < new Date()
+                              ? "bg-rose-50 text-rose-700 border-rose-200 shadow-sm shadow-rose-100"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          )}>
+                            {new Date(anyOrder.pickupDate) < new Date()
+                              ? "Overdue Alert"
+                              : "On Schedule"}
+                          </Badge>
+                        ) : null}
+                        <Badge variant="outline" className="font-black border-slate-900 bg-slate-900 text-white dark:bg-slate-800 dark:border-slate-700 text-[10px] uppercase tracking-widest px-3 py-1 rounded-lg">
+                          {storeLabel}
+                        </Badge>
+                      </div>
+
+                      {showExpected && anyOrder.pickupDate && (
+                        <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span>Expected by {expectedDate}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">

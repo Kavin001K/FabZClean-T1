@@ -25,6 +25,7 @@ import {
 } from "../services/whatsapp.service";
 import { sendOrderConfirmationEmail } from "../services/order-confirmation-email.service";
 import { processOrderBillingPipeline } from "../services/order-invoice.service";
+import { sendOrderInvoiceEmail } from "../services/smtp-email.service";
 
 const router = Router();
 const orderService = new OrderService();
@@ -1584,6 +1585,67 @@ router.post('/:id/log-print', async (req, res) => {
   } catch (error) {
     console.error('Log print error:', error);
     res.status(500).json(createErrorResponse('Failed to log print action', 500));
+  }
+});
+
+// Send order bill/invoice email manually
+router.post('/:id/send-email-bill', jwtRequired, async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const order = await storage.getOrder(orderId);
+    if (!order) {
+      return res.status(404).json(createErrorResponse('Order not found', 404));
+    }
+
+    if (!order.customerEmail) {
+      return res.status(400).json(createErrorResponse('Customer email is not registered for this order', 400));
+    }
+
+    // Ensure the invoice document/PDF is generated and stored in Cloudflare R2
+    const billingResult = await processOrderBillingPipeline(orderId);
+    if (!billingResult.success) {
+      return res.status(500).json(createErrorResponse(`Failed to process billing pipeline: ${billingResult.error || 'Unknown error'}`, 500));
+    }
+
+    const emailResult = await sendOrderInvoiceEmail({
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      totalAmount: order.totalAmount,
+      paymentStatus: order.paymentStatus || 'pending',
+      paymentMethod: order.paymentMethod || 'cash',
+      invoiceUrl: billingResult.invoiceUrl!,
+      items: (order.items as any[]) || [],
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json(createErrorResponse(`SMTP Email sending failed: ${emailResult.error || 'Unknown SMTP error'}`, 500));
+    }
+
+    if (req.employee) {
+      try {
+        await AuthService.logAction(
+          req.employee.employeeId,
+          req.employee.username,
+          'send_invoice_email',
+          'order',
+          orderId,
+          {
+            orderNumber: order.orderNumber,
+            customerEmail: order.customerEmail,
+          },
+          req.ip || req.connection.remoteAddress,
+          req.get('user-agent')
+        );
+      } catch (logErr) {
+        console.warn('Failed to log email bill action:', logErr);
+      }
+    }
+
+    res.json(createSuccessResponse(null, 'Invoice email sent successfully'));
+  } catch (error: any) {
+    console.error('Send invoice email error:', error);
+    res.status(500).json(createErrorResponse(`Failed to send invoice email: ${error.message || ''}`, 500));
   }
 });
 

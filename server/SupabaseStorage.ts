@@ -69,6 +69,48 @@ export class SupabaseStorage {
         return data;
     }
 
+    async recalculateCustomerStats(customerId: string): Promise<void> {
+        try {
+            // Get all orders for this customer
+            const { data: orders, error } = await this.supabase
+                .from('orders')
+                .select('*')
+                .eq('customer_id', customerId);
+
+            if (error) throw error;
+
+            // Valid orders for spending/count are non-cancelled, non-refunded
+            const validOrders = (orders || []).filter((o: any) =>
+                o.status !== 'cancelled' &&
+                String(o.status) !== 'refunded'
+            );
+
+            const totalOrders = validOrders.length;
+            const totalSpent = validOrders.reduce((sum: number, o: any) => sum + parseFloat(o.total_amount || '0'), 0);
+            
+            // Find last order date
+            let lastOrder: string | null = null;
+            if (validOrders.length > 0) {
+                const dates = validOrders.map((o: any) => new Date(o.created_at || 0).getTime());
+                lastOrder = new Date(Math.max(...dates)).toISOString();
+            }
+
+            // Update customer table with the calculated values
+            await this.supabase
+                .from('customers')
+                .update({
+                    total_orders: totalOrders,
+                    total_spent: totalSpent.toFixed(2),
+                    ...(lastOrder ? { last_order: lastOrder } : {})
+                })
+                .eq('id', customerId);
+
+            console.log(`✅ [SupabaseStorage] Automatically recalculated stats for customer: ${customerId}. Orders: ${totalOrders}, Spent: ${totalSpent.toFixed(2)}`);
+        } catch (error) {
+            console.error(`❌ [SupabaseStorage] Failed to recalculate stats for customer ${customerId}:`, error);
+        }
+    }
+
     private async writeOrderRecord(
         operation: 'insert' | 'update',
         payload: Record<string, any>,
@@ -83,6 +125,11 @@ export class SupabaseStorage {
         if (error) {
             console.error(`[SupabaseStorage] orders ${operation} failed:`, error.message, error.details);
             throw error;
+        }
+
+        if (data && data.customer_id) {
+            // Automatically recalculate stats in background
+            setImmediate(() => this.recalculateCustomerStats(data.customer_id));
         }
 
         return data;
@@ -249,6 +296,10 @@ export class SupabaseStorage {
             // Express/Priority mappings
             'is_express_order': 'isExpressOrder',
             'priority': 'priority',
+            'order_type': 'orderType',
+            'express_charge': 'expressCharge',
+            'instant_charge': 'instantCharge',
+            'status_timestamps': 'statusTimestamps',
             // Print queue mappings
             'tags_printed': 'tagsPrinted',
             // Delivery earnings & analytics mappings
@@ -458,6 +509,10 @@ export class SupabaseStorage {
             // Express/Priority mappings
             'isExpressOrder': 'is_express_order',
             'priority': 'priority',
+            'orderType': 'order_type',
+            'expressCharge': 'express_charge',
+            'instantCharge': 'instant_charge',
+            'statusTimestamps': 'status_timestamps',
             // WhatsApp tracking mappings
             'lastWhatsappStatus': 'last_whatsapp_status',
             'lastWhatsappSentAt': 'last_whatsapp_sent_at',
@@ -785,100 +840,185 @@ export class SupabaseStorage {
             dateTo?: string;
         } = {}
     ): Promise<{ data: Customer[]; totalCount: number }> {
-        let query = this.supabase.from('customers').select('*', { count: 'exact' });
-        if (franchiseId) query = query.eq('franchise_id', franchiseId);
-        query = query.neq('status', 'deleted');
+        const hasExplicitLimit = options.limit !== undefined && options.limit > 0;
+        const hasPagination = options.offset !== undefined || options.page !== undefined;
 
-        const search = String(options.search || '').trim();
-        if (search) {
-            const safeSearch = search.replace(/[%_]/g, '');
-            const digitsOnly = search.replace(/\D/g, '');
-            const isPhoneSearch = digitsOnly.length >= 4 && digitsOnly.length === safeSearch.length;
-            
-            // Build a valid PostgREST OR query string
-            const conditions: string[] = [];
-            
-            // Always add name/email search for non-pure-digit queries of 2+ chars
-            if (safeSearch.length >= 2 && !isPhoneSearch) {
-                conditions.push(`name.ilike.%${safeSearch}%`);
-                conditions.push(`email.ilike.%${safeSearch}%`);
-            }
-            
-            // For phone search: match on any digit substring (even 1 char)
-            if (digitsOnly.length >= 1) {
-                conditions.push(`phone.ilike.%${digitsOnly}%`);
-                conditions.push(`secondary_phone.ilike.%${digitsOnly}%`);
-            }
+        if (hasExplicitLimit || hasPagination) {
+            let query = this.supabase.from('customers').select('*', { count: 'exact' });
+            if (franchiseId) query = query.eq('franchise_id', franchiseId);
+            query = query.neq('status', 'deleted');
 
-            // Also try ID search (customer IDs like FZC26MY...)
-            if (safeSearch.length >= 3) {
-                conditions.push(`id.ilike.%${safeSearch}%`);
-            }
-
-
-            // Also try name search for mixed queries (e.g. "Suga" or longer)
-            if (isPhoneSearch && safeSearch.length >= 2) {
-                // Even for a pure-digit search, add name/email in case the name contains digits
-                conditions.push(`name.ilike.%${safeSearch}%`);
-            }
-            
-            if (conditions.length > 0) {
-                query = query.or(conditions.join(','));
-            }
-        }
-
-        const phone = String(options.phone || '').trim();
-        if (phone) {
-            query = query.or(`phone.eq.${phone},secondary_phone.eq.${phone}`);
-        }
-
-        if (options.dateFrom) {
-            query = query.gte('created_at', options.dateFrom);
-        }
-
-        if (options.dateTo) {
-            query = query.lte('created_at', options.dateTo);
-        }
-
-        // Apply sorting
-        if (options.sortBy) {
-            const isAscending = options.sortOrder !== 'desc';
-            const mappedSortBy = this.toSnakeCase({ [options.sortBy]: true });
-            const sortField = Object.keys(mappedSortBy)[0] || options.sortBy;
-            query = query.order(sortField, { ascending: isAscending });
-            if (sortField !== 'id') {
-                query = query.order('id', { ascending: false });
-            }
-        } else {
-            // Default sort by relevance, then newest
+            const search = String(options.search || '').trim();
             if (search) {
-                query = query.order('id', { ascending: false });
+                const safeSearch = search.replace(/[%_]/g, '');
+                const digitsOnly = search.replace(/\D/g, '');
+                const isPhoneSearch = digitsOnly.length >= 4 && digitsOnly.length === safeSearch.length;
+                
+                const conditions: string[] = [];
+                if (safeSearch.length >= 2 && !isPhoneSearch) {
+                    conditions.push(`name.ilike.%${safeSearch}%`);
+                    conditions.push(`email.ilike.%${safeSearch}%`);
+                }
+                if (digitsOnly.length >= 1) {
+                    conditions.push(`phone.ilike.%${digitsOnly}%`);
+                    conditions.push(`secondary_phone.ilike.%${digitsOnly}%`);
+                }
+                if (safeSearch.length >= 3) {
+                    conditions.push(`id.ilike.%${safeSearch}%`);
+                }
+                if (isPhoneSearch && safeSearch.length >= 2) {
+                    conditions.push(`name.ilike.%${safeSearch}%`);
+                }
+                if (conditions.length > 0) {
+                    query = query.or(conditions.join(','));
+                }
+            }
+
+            const phone = String(options.phone || '').trim();
+            if (phone) {
+                query = query.or(`phone.eq.${phone},secondary_phone.eq.${phone}`);
+            }
+
+            if (options.dateFrom) {
+                query = query.gte('created_at', options.dateFrom);
+            }
+
+            if (options.dateTo) {
+                query = query.lte('created_at', options.dateTo);
+            }
+
+            if (options.sortBy) {
+                const isAscending = options.sortOrder !== 'desc';
+                const mappedSortBy = this.toSnakeCase({ [options.sortBy]: true });
+                const sortField = Object.keys(mappedSortBy)[0] || options.sortBy;
+                query = query.order(sortField, { ascending: isAscending });
+                if (sortField !== 'id') {
+                    query = query.order('id', { ascending: false });
+                }
             } else {
-                query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+                if (search) {
+                    query = query.order('id', { ascending: false });
+                } else {
+                    query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+                }
+            }
+
+            const MAX_SUPABASE_ROWS = 1000;
+            const rawLimit = options.limit && options.limit > 0 ? options.limit : 50;
+            const limitToApply = Math.min(rawLimit, MAX_SUPABASE_ROWS);
+            const offsetToApply = options.offset !== undefined ? options.offset : 
+                                 (options.page !== undefined ? (options.page - 1) * limitToApply : 0);
+            
+            query = query.range(offsetToApply, offsetToApply + limitToApply - 1);
+
+            const { data, error, count } = await query;
+            if (error) {
+                console.error('[SupabaseStorage] listCustomers Query Error:', error);
+                throw error;
+            }
+            
+            return {
+                data: (data || []).map(item => this.mapDates(item)),
+                totalCount: count || 0
+            };
+        }
+
+        // Otherwise, recursively page in chunks of 1000 to fetch ALL matching records
+        const allCustomers: Customer[] = [];
+        let pageNum = 1;
+        let hasMore = true;
+        const pageSize = 1000;
+        let totalCount = 0;
+
+        while (hasMore) {
+            let query = this.supabase.from('customers').select('*', { count: 'exact' });
+            if (franchiseId) query = query.eq('franchise_id', franchiseId);
+            query = query.neq('status', 'deleted');
+
+            const search = String(options.search || '').trim();
+            if (search) {
+                const safeSearch = search.replace(/[%_]/g, '');
+                const digitsOnly = search.replace(/\D/g, '');
+                const isPhoneSearch = digitsOnly.length >= 4 && digitsOnly.length === safeSearch.length;
+                
+                const conditions: string[] = [];
+                if (safeSearch.length >= 2 && !isPhoneSearch) {
+                    conditions.push(`name.ilike.%${safeSearch}%`);
+                    conditions.push(`email.ilike.%${safeSearch}%`);
+                }
+                if (digitsOnly.length >= 1) {
+                    conditions.push(`phone.ilike.%${digitsOnly}%`);
+                    conditions.push(`secondary_phone.ilike.%${digitsOnly}%`);
+                }
+                if (safeSearch.length >= 3) {
+                    conditions.push(`id.ilike.%${safeSearch}%`);
+                }
+                if (isPhoneSearch && safeSearch.length >= 2) {
+                    conditions.push(`name.ilike.%${safeSearch}%`);
+                }
+                if (conditions.length > 0) {
+                    query = query.or(conditions.join(','));
+                }
+            }
+
+            const phone = String(options.phone || '').trim();
+            if (phone) {
+                query = query.or(`phone.eq.${phone},secondary_phone.eq.${phone}`);
+            }
+
+            if (options.dateFrom) {
+                query = query.gte('created_at', options.dateFrom);
+            }
+
+            if (options.dateTo) {
+                query = query.lte('created_at', options.dateTo);
+            }
+
+            if (options.sortBy) {
+                const isAscending = options.sortOrder !== 'desc';
+                const mappedSortBy = this.toSnakeCase({ [options.sortBy]: true });
+                const sortField = Object.keys(mappedSortBy)[0] || options.sortBy;
+                query = query.order(sortField, { ascending: isAscending });
+                if (sortField !== 'id') {
+                    query = query.order('id', { ascending: false });
+                }
+            } else {
+                if (search) {
+                    query = query.order('id', { ascending: false });
+                } else {
+                    query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+                }
+            }
+
+            const from = (pageNum - 1) * pageSize;
+            const to = from + pageSize - 1;
+            query = query.range(from, to);
+
+            const { data, error, count } = await query;
+            if (error) {
+                console.error('[SupabaseStorage] listCustomers recursive Query Error:', error);
+                throw error;
+            }
+
+            if (count !== null) {
+                totalCount = count;
+            }
+
+            if (data && data.length > 0) {
+                allCustomers.push(...data.map(item => this.mapDates(item)));
+                if (data.length < pageSize) {
+                    hasMore = false;
+                } else {
+                    pageNum++;
+                }
+            } else {
+                hasMore = false;
             }
         }
 
-        // Apply pagination — cap limit to Supabase safe max (1000)
-        // Supabase PostgREST has a default max-rows setting; requesting
-        // ranges beyond it returns empty data silently.
-        const MAX_SUPABASE_ROWS = 1000;
-        const rawLimit = options.limit && options.limit > 0 ? options.limit : 50;
-        const limitToApply = Math.min(rawLimit, MAX_SUPABASE_ROWS);
-        const offsetToApply = options.offset !== undefined ? options.offset : 
-                             (options.page !== undefined ? (options.page - 1) * limitToApply : 0);
-        
-        query = query.range(offsetToApply, offsetToApply + limitToApply - 1);
-
-        // Execute query
-        const { data, error, count } = await query;
-        if (error) {
-            console.error('[SupabaseStorage] listCustomers Query Error:', error);
-            throw error;
-        }
-        
         return {
-            data: (data || []).map(item => this.mapDates(item)),
-            totalCount: count || 0
+            data: allCustomers,
+            totalCount: totalCount || allCustomers.length
         };
     }
     async getCustomers(franchiseId?: string): Promise<Customer[]> { 
@@ -1049,6 +1189,12 @@ export class SupabaseStorage {
             delete (cleanData as any).lastWhatsappStatus;
             delete (cleanData as any).lastWhatsappSentAt;
 
+            if (!cleanData.statusTimestamps) {
+                (cleanData as any).statusTimestamps = {
+                    [cleanData.status || 'pending']: new Date().toISOString()
+                };
+            }
+
             const snakeCaseData = this.toSnakeCase(cleanData);
 
             // Remove fields that may not exist in the orders table to prevent schema errors
@@ -1065,7 +1211,9 @@ export class SupabaseStorage {
                 'bag_count', 'cover_type',
                 // Booking intake tracking fields
                 'booking_source', 'booking_channel', 'booking_slot', 'booking_context',
-                'booking_request_id', 'booking_id'
+                'booking_request_id', 'booking_id',
+                // Surcharges & Type fields
+                'order_type', 'express_charge', 'instant_charge', 'status_timestamps'
             ];
             const safeData: any = {};
             for (const key of Object.keys(snakeCaseData)) {
@@ -1126,6 +1274,21 @@ export class SupabaseStorage {
     }
 
     async updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order | undefined> {
+        if (data.status) {
+            try {
+                const existingOrder = await this.getOrder(id);
+                if (existingOrder) {
+                    const currentTimestamps = typeof existingOrder.statusTimestamps === 'object' && existingOrder.statusTimestamps 
+                        ? { ...existingOrder.statusTimestamps } 
+                        : {};
+                    currentTimestamps[data.status] = new Date().toISOString();
+                    data.statusTimestamps = currentTimestamps;
+                }
+            } catch (err) {
+                console.warn('[SupabaseStorage] failed to fetch existing order to update status timestamps:', err);
+            }
+        }
+
         const snakeData = this.toSnakeCase(data);
         console.log('[SupabaseStorage] updateOrder:', id, Object.keys(snakeData));
         let order;
@@ -1155,6 +1318,9 @@ export class SupabaseStorage {
             }
 
             if (!data) return undefined;
+            if (data.customer_id) {
+                setImmediate(() => this.recalculateCustomerStats(data.customer_id));
+            }
             return this.mapDates(data);
         } catch (error: any) {
             if (this.shouldFallbackCancelOrderRpc(error)) {
@@ -1167,8 +1333,17 @@ export class SupabaseStorage {
     }
 
     async deleteOrder(id: string): Promise<boolean> {
-        const { error } = await this.supabase.from('orders').delete().eq('id', id);
-        return !error;
+        try {
+            const order = await this.getOrder(id);
+            const { error } = await this.supabase.from('orders').delete().eq('id', id);
+            if (!error && order && order.customerId) {
+                setImmediate(() => this.recalculateCustomerStats(order.customerId));
+            }
+            return !error;
+        } catch (err) {
+            console.error('[SupabaseStorage] deleteOrder exception:', err);
+            return false;
+        }
     }
 
     async getDueDateOrders(dateStr: string): Promise<Order[]> {
@@ -1198,55 +1373,121 @@ export class SupabaseStorage {
         limit?: number;
         page?: number;
     } = {}): Promise<Order[]> {
-        let query = this.supabase.from('orders').select('*');
-        if (franchiseId) query = query.eq('franchise_id', franchiseId);
-
-        if (options.customerId) {
-            query = query.eq('customer_id', options.customerId);
-        }
-
-        if (options.status && options.status !== 'all') {
-            query = query.eq('status', options.status);
-        }
-
-        if (options.customerEmail) {
-            query = query.eq('customer_email', options.customerEmail);
-        }
-
-        if (options.dateFrom) {
-            query = query.gte('created_at', options.dateFrom);
-        }
-
-        if (options.dateTo) {
-            query = query.lte('created_at', options.dateTo);
-        }
-
-        if (options.search) {
-            const safeSearch = String(options.search).trim();
-            query = query.or(`customer_name.ilike.%${safeSearch}%,order_number.ilike.%${safeSearch}%,customer_phone.ilike.%${safeSearch}%`);
-        }
-
-        if (options.sortBy) {
-            // Map camelCase to snake_case for Supabase
-            const snakeSortBy = options.sortBy.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-            query = query.order(snakeSortBy, { ascending: options.sortOrder === 'asc' });
-            if (snakeSortBy !== 'id') {
-                query = query.order('id', { ascending: false });
-            }
-        } else {
-            query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
-        }
-
+        // If a limit is specified, perform a single-page query
         if (options.limit) {
+            let query = this.supabase.from('orders').select('*');
+            if (franchiseId) query = query.eq('franchise_id', franchiseId);
+
+            if (options.customerId) {
+                query = query.eq('customer_id', options.customerId);
+            }
+
+            if (options.status && options.status !== 'all') {
+                query = query.eq('status', options.status);
+            }
+
+            if (options.customerEmail) {
+                query = query.eq('customer_email', options.customerEmail);
+            }
+
+            if (options.dateFrom) {
+                query = query.gte('created_at', options.dateFrom);
+            }
+
+            if (options.dateTo) {
+                query = query.lte('created_at', options.dateTo);
+            }
+
+            if (options.search) {
+                const safeSearch = String(options.search).trim();
+                query = query.or(`customer_name.ilike.%${safeSearch}%,order_number.ilike.%${safeSearch}%,customer_phone.ilike.%${safeSearch}%`);
+            }
+
+            if (options.sortBy) {
+                const snakeSortBy = options.sortBy.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+                query = query.order(snakeSortBy, { ascending: options.sortOrder === 'asc' });
+                if (snakeSortBy !== 'id') {
+                    query = query.order('id', { ascending: false });
+                }
+            } else {
+                query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+            }
+
             const pageNum = options.page || 1;
             const from = (pageNum - 1) * options.limit;
             const to = from + options.limit - 1;
             query = query.range(from, to);
+
+            const { data, error } = await query;
+            if (error) throw error;
+            return data.map(item => this.mapDates(item));
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
-        return data.map(item => this.mapDates(item));
+        // If no limit is specified, fetch ALL matching records by chunking in pages of 1000
+        const allOrders: Order[] = [];
+        let page = 1;
+        let hasMore = true;
+        const pageSize = 1000;
+
+        while (hasMore) {
+            let query = this.supabase.from('orders').select('*');
+            if (franchiseId) query = query.eq('franchise_id', franchiseId);
+
+            if (options.customerId) {
+                query = query.eq('customer_id', options.customerId);
+            }
+
+            if (options.status && options.status !== 'all') {
+                query = query.eq('status', options.status);
+            }
+
+            if (options.customerEmail) {
+                query = query.eq('customer_email', options.customerEmail);
+            }
+
+            if (options.dateFrom) {
+                query = query.gte('created_at', options.dateFrom);
+            }
+
+            if (options.dateTo) {
+                query = query.lte('created_at', options.dateTo);
+            }
+
+            if (options.search) {
+                const safeSearch = String(options.search).trim();
+                query = query.or(`customer_name.ilike.%${safeSearch}%,order_number.ilike.%${safeSearch}%,customer_phone.ilike.%${safeSearch}%`);
+            }
+
+            if (options.sortBy) {
+                const snakeSortBy = options.sortBy.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+                query = query.order(snakeSortBy, { ascending: options.sortOrder === 'asc' });
+                if (snakeSortBy !== 'id') {
+                    query = query.order('id', { ascending: false });
+                }
+            } else {
+                query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+            }
+
+            const from = (page - 1) * pageSize;
+            const to = from + pageSize - 1;
+            query = query.range(from, to);
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                allOrders.push(...data.map(item => this.mapDates(item)));
+                if (data.length < pageSize) {
+                    hasMore = false;
+                } else {
+                    page++;
+                }
+            } else {
+                hasMore = false;
+            }
+        }
+
+        return allOrders;
     }
 
     async countOrders(franchiseId?: string, options: {

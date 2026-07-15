@@ -1063,6 +1063,7 @@ router.post(
   validateInput(insertCustomerSchema),
   async (req, res) => {
     try {
+
       const customerData = normalizeCustomerPhonePayload(req.body);
 
       if (!customerData.phone) {

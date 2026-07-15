@@ -79,8 +79,9 @@ const safeParseFloat = (val: any) => {
 };
 
 const toDateOnly = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
-const DEFAULT_DUE_DATE_OFFSET_DAYS = 12;
-const EXPRESS_DUE_DATE_OFFSET_DAYS = 3;
+const DEFAULT_DUE_DATE_OFFSET_DAYS = 8;
+const EXPRESS_DUE_DATE_OFFSET_DAYS = 4;
+const INSTANT_DUE_DATE_OFFSET_DAYS = 2;
 
 const toOrderCreatedAt = (value: Date) =>
   new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate(), 12, 0, 0)).toISOString();
@@ -130,7 +131,8 @@ export default function CreateOrder() {
 
   // Order details (must be before useEffect that references it)
   const [specialInstructions, setSpecialInstructions] = useState('');
-  const [isExpressOrder, setIsExpressOrder] = useState(false);
+  const [orderType, setOrderType] = useState<'normal' | 'express' | 'instant'>('normal');
+  const isExpressOrder = orderType === 'express' || orderType === 'instant';
   const [bagCount, setBagCount] = useState(1);
   const [coverType, setCoverType] = useState<OrderCoverType>('bag');
 
@@ -332,12 +334,16 @@ export default function CreateOrder() {
   }, [selectedServices]);
 
   const expressSurcharge = useMemo(() => {
-    return isExpressOrder ? baseSubtotal * 0.5 : 0;
-  }, [baseSubtotal, isExpressOrder]);
+    return orderType === 'express' ? baseSubtotal * 0.5 : 0;
+  }, [baseSubtotal, orderType]);
+
+  const instantSurcharge = useMemo(() => {
+    return orderType === 'instant' ? baseSubtotal * 1.0 : 0;
+  }, [baseSubtotal, orderType]);
 
   const subtotal = useMemo(() => {
-    return (baseSubtotal + expressSurcharge);
-  }, [baseSubtotal, expressSurcharge]);
+    return (baseSubtotal + expressSurcharge + instantSurcharge);
+  }, [baseSubtotal, expressSurcharge, instantSurcharge]);
 
   const discountAmount = useMemo(() => {
     if (discountType === 'percentage') {
@@ -788,14 +794,17 @@ export default function CreateOrder() {
     }
   }, [lastAddedInstanceKey, selectedServices]);
 
-  // Auto-set due date: 12 days (regular) or 3 days (express) from the selected order creation date
+  // Auto-set due date: 8 days (regular), 4 days (express), or 2 days (instant) from the selected order creation date
   useEffect(() => {
-    const offsetDays = isExpressOrder ? EXPRESS_DUE_DATE_OFFSET_DAYS : DEFAULT_DUE_DATE_OFFSET_DAYS;
+    const offsetDays = 
+      orderType === 'instant' ? INSTANT_DUE_DATE_OFFSET_DAYS :
+      orderType === 'express' ? EXPRESS_DUE_DATE_OFFSET_DAYS :
+      DEFAULT_DUE_DATE_OFFSET_DAYS;
     const dueDate = new Date(
       toDateOnly(billDate).getTime() + offsetDays * 24 * 60 * 60 * 1000
     );
     setPickupDate(dueDate);
-  }, [billDate, isExpressOrder]);
+  }, [billDate, orderType]);
 
   // Mutation for updating order status from history
   const updateOrderStatusMutation = useMutation({
@@ -1023,7 +1032,7 @@ export default function CreateOrder() {
     setGstNumber('');
     setPanNumber('');
     // Reset express order and fulfillment
-    setIsExpressOrder(false);
+    setOrderType('normal');
     setFulfillmentType('pickup');
     setDeliveryAddress('');
     setDeliveryCharges(0);
@@ -1218,8 +1227,11 @@ export default function CreateOrder() {
       deliveryCharges: deliveryCharges.toString(),
       deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress : undefined,
       // Express/Priority Order
-      isExpressOrder: isExpressOrder,
-      priority: isExpressOrder ? 'high' : 'normal',
+      isExpressOrder: orderType === 'express' || orderType === 'instant',
+      priority: orderType === 'instant' ? 'urgent' : orderType === 'express' ? 'high' : 'normal',
+      orderType: orderType,
+      expressCharge: expressSurcharge.toString(),
+      instantCharge: instantSurcharge.toString(),
       // Wallet usage
       useWallet: useWallet,
       // Bag count
@@ -2160,37 +2172,63 @@ export default function CreateOrder() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Express Order Toggle - Priority with 50% surcharge */}
-                <div className={cn(
-                  "flex items-center justify-between space-x-2 p-4 rounded-lg border-2 transition-all",
-                  isExpressOrder
-                    ? "border-orange-500 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30"
-                    : "border-dashed border-gray-300 bg-muted/10"
-                )}>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="express-mode" className="text-base font-semibold">
-                        ⚡ Express Order
-                      </Label>
-                      {isExpressOrder && (
-                        <Badge className="bg-orange-500 text-white animate-pulse">
-                          PRIORITY
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {isExpressOrder
-                        ? "🔥 50% surcharge applied • 3-day turnaround • Fast tracked transit"
-                        : "Enable for priority processing (+50% charge, 3-day turnaround)"
+                {/* Order Type Selector */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      {
+                        value: 'normal',
+                        label: 'Standard',
+                        days: '8 Days',
+                        surcharge: '+0%',
+                        desc: 'Standard turn',
+                        color: 'border-slate-200 dark:border-slate-800',
+                        activeColor: 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400'
+                      },
+                      {
+                        value: 'express',
+                        label: 'Express',
+                        days: '4 Days',
+                        surcharge: '+50%',
+                        desc: 'Fast tracked',
+                        color: 'border-slate-200 dark:border-slate-800',
+                        activeColor: 'border-orange-500 bg-orange-50/50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-400'
+                      },
+                      {
+                        value: 'instant',
+                        label: 'Instant',
+                        days: '48 Hours',
+                        surcharge: '+100%',
+                        desc: 'Urgent priority',
+                        color: 'border-slate-200 dark:border-slate-800',
+                        activeColor: 'border-red-500 bg-red-50/50 dark:bg-red-950/20 text-red-700 dark:text-red-400'
                       }
-                    </p>
+                    ].map((tier) => {
+                      const isActive = orderType === tier.value;
+                      return (
+                        <button
+                          key={tier.value}
+                          type="button"
+                          onClick={() => setOrderType(tier.value as any)}
+                          className={cn(
+                            "flex flex-col items-center justify-between p-3 rounded-xl border-2 text-center transition-all duration-200 hover:scale-[1.02]",
+                            isActive ? tier.activeColor : `${tier.color} bg-card hover:bg-muted/30`
+                          )}
+                        >
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider">{tier.label}</span>
+                            <span className="text-base font-black tracking-tight">{tier.days}</span>
+                          </div>
+                          <div className="mt-2 flex flex-col items-center">
+                            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-current/10">
+                              {tier.surcharge} Cost
+                            </span>
+                            <span className="mt-1 text-[8px] opacity-70 leading-none">{tier.desc}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <Switch
-                    id="express-mode"
-                    checked={isExpressOrder}
-                    onCheckedChange={setIsExpressOrder}
-                    className={isExpressOrder ? "data-[state=checked]:bg-orange-500" : ""}
-                  />
                 </div>
 
                 {/* GST Toggle */}
@@ -2643,7 +2681,7 @@ export default function CreateOrder() {
                     </div>
   
                     <AnimatePresence>
-                      {isExpressOrder && (
+                      {orderType === 'express' && (
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
@@ -2653,6 +2691,19 @@ export default function CreateOrder() {
                             <Zap className="h-3.5 w-3.5 flex-shrink-0" /> <span className="truncate">Express (50%)</span>
                           </span>
                           <span className="flex-shrink-0">+Rs. {expressSurcharge.toFixed(2)}</span>
+                        </motion.div>
+                      )}
+
+                      {orderType === 'instant' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="flex justify-between gap-4 text-sm text-red-600 dark:text-red-400 font-black"
+                        >
+                          <span className="flex items-center gap-1 min-w-0">
+                            <Zap className="h-3.5 w-3.5 flex-shrink-0 text-red-500" /> <span className="truncate">Instant (100%)</span>
+                          </span>
+                          <span className="flex-shrink-0">+Rs. {instantSurcharge.toFixed(2)}</span>
                         </motion.div>
                       )}
   
@@ -2702,11 +2753,14 @@ export default function CreateOrder() {
                          <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80 block truncate">
                            {useWallet && walletApplied > 0 ? 'Balance Due' : 'Payable Amount'}
                          </span>
-                         {isExpressOrder && (
-                           <p className="text-[10px] text-amber-300 font-black uppercase mt-0.5 tracking-wider truncate">
-                             Express Order
-                           </p>
-                         )}
+                         {orderType !== 'normal' && (
+                            <p className={cn(
+                              "text-[10px] font-black uppercase mt-0.5 tracking-wider truncate",
+                              orderType === 'instant' ? "text-red-200" : "text-amber-300"
+                            )}>
+                              {orderType === 'instant' ? '⚡ Instant Order (48H)' : '⚡ Express Order (4D)'}
+                            </p>
+                          )}
                       </div>
                       <span className="text-3xl font-black tabular-nums flex-shrink-0">Rs. {finalPayable.toFixed(2)}</span>
                     </div>
@@ -3087,7 +3141,7 @@ export default function CreateOrder() {
           setCustomerCity('');
           setCustomerPincode('');
           setSpecialInstructions('');
-          setIsExpressOrder(false);
+          setOrderType('normal');
           setDiscountValue(0);
           setExtraCharges(0);
           setBagCount(1);
