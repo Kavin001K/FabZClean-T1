@@ -57,8 +57,12 @@ app.get('/api/performance', (req, res) => {
   // Routes are registered via registerAllRoutes(app) below
 
   // Determine environment
-  // Force production mode if running on Render (RENDER=true) or if NODE_ENV is production
-  const isProduction = process.env.NODE_ENV === "production" || !!process.env.RENDER;
+  // Force production mode when deployed on Firebase Hosting + Cloud Run/GCP
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    !!process.env.K_SERVICE ||
+    !!process.env.FUNCTION_TARGET ||
+    !!process.env.FIREBASE_CONFIG;
 
   // Create HTTP server
   // Always use WebSocket-enabled server for real-time features

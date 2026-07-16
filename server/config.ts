@@ -1,6 +1,6 @@
 /**
  * Centralized Configuration Management for FabZClean
- * Configured for self-hosted Ubuntu server deployment
+ * Configured for Firebase Hosting + Cloud Run / GCP deployment
  */
 
 // Note: dotenv should be loaded by the application entry point (server/index.ts)
@@ -83,7 +83,7 @@ function validateConfig(): void {
     `📝 Environment: ${config.isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`
   );
   console.log(
-    `🚀 Deployment: Self-hosted Ubuntu Server`
+    `🚀 Deployment: Firebase Hosting + Cloud Run`
   );
   if (config.staticIP) {
     console.log(`🌐 Static IP: ${config.staticIP}`);
@@ -115,4 +115,3 @@ export function getExternalApiConfig(): {
     baseUrl: config.externalApiBaseUrl!,
   };
 }
-

@@ -203,15 +203,24 @@ npm start
 ## 🚢 Deployment
 
 ### Recommended Platforms
-- **Frontend**: Vercel, Netlify, or Cloudflare Pages
-- **Backend**: Render, Railway, or Heroku
-- **Database**: Supabase (included)
+- **Frontend**: Firebase Hosting
+- **Backend**: Cloud Run on Google Cloud
+- **Database**: Supabase (existing managed database)
 
 ### Environment Variables
 Set these in your production environment:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `NODE_ENV=production`
+
+### Firebase / GCP Deployment
+This project is set up to serve the frontend from Firebase Hosting and route
+`/api` and `/socket.io` traffic to the `fabzclean-backend` Cloud Run service.
+
+Typical deployment flow:
+1. Build the app: `npm run build`
+2. Deploy the backend container to Cloud Run
+3. Deploy Firebase Hosting: `firebase deploy --only hosting`
 
 ## 🔧 Development Scripts
 

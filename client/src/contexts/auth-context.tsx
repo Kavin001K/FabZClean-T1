@@ -77,7 +77,7 @@ const shouldUseDirectSupabase = (): boolean => {
 
   // If the app is served from a backend (same-origin), the backend handles auth.
   // Direct Supabase auth is ONLY for standalone static hosting (e.g. Amplify/CloudFront)
-  // where there is no backend at all. In self-hosted mode (Render, VPS, etc.),
+  // where there is no backend at all. In Firebase Hosting + Cloud Run mode,
   // the backend is at the same origin and provides /api/auth/login.
   const host = window.location.hostname;
   const isStaticHosting = host.includes('amplifyapp.com') || host.includes('cloudfront.net');
