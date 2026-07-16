@@ -37,6 +37,7 @@ interface GarmentTagPrintProps {
   coverType?: OrderCoverType | string;
   totalItems?: number;
   totalServices?: number;
+  orderType?: string;
 }
 
 export function GarmentTagPrint({
@@ -55,6 +56,7 @@ export function GarmentTagPrint({
   coverType = 'bag',
   totalItems,
   totalServices,
+  orderType,
 }: GarmentTagPrintProps) {
   const preparedTags = useMemo(() => prepareThermalTags({
     orderNumber,
@@ -66,7 +68,8 @@ export function GarmentTagPrint({
     billDate,
     dueDate,
     items,
-  }), [orderNumber, customerName, customerAddress, franchiseId, storeCode, commonNote, billDate, dueDate, items]);
+    orderType,
+  }), [orderNumber, customerName, customerAddress, franchiseId, storeCode, commonNote, billDate, dueDate, items, orderType]);
 
   const preparedBagTags = useMemo(() => {
     const count = Math.max(1, bagCount);
@@ -83,8 +86,9 @@ export function GarmentTagPrint({
       totalServices: svcCount,
       bagCount: count,
       coverType,
+      orderType,
     });
-  }, [orderNumber, customerName, franchiseId, storeCode, billDate, dueDate, bagCount, coverType, totalItems, totalServices, items]);
+  }, [orderNumber, customerName, franchiseId, storeCode, billDate, dueDate, bagCount, coverType, totalItems, totalServices, items, orderType]);
 
   const handlePrint = () => {
     if (preparedTags.length === 0) {

@@ -1754,7 +1754,7 @@ function OrdersComponent() {
                 <Checkbox checked={selectedOrders.includes(order.id)} onCheckedChange={() => handleSelectOrder(order.id)} />
               </div>
               <div className="min-w-0">
-                <p className="font-mono font-black text-primary text-sm tracking-tighter uppercase">{order.orderNumber}</p>
+                <p className="font-mono font-black text-primary text-sm tracking-tighter uppercase" title={order.orderNumber}>#{order.orderNumber.slice(-5)}</p>
                 <p className="text-[11px] text-muted-foreground font-medium">{formatDate((order.createdAt || new Date()).toString())}</p>
               </div>
             </div>
@@ -1876,7 +1876,7 @@ function OrdersComponent() {
           <Checkbox checked={selectedOrders.includes(order.id)} onCheckedChange={() => handleSelectOrder(order.id)} />
         </div>
         <div className="min-w-0 truncate font-mono font-medium flex items-center gap-2">
-          {order.orderNumber}
+          <span title={order.orderNumber}>#{order.orderNumber.slice(-5)}</span>
           {(() => {
             const priorityInfo = getOrderPriorityInfo(order as any);
             return priorityInfo.isPriority ? (

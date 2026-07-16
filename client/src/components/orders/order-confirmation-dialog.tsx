@@ -633,6 +633,7 @@ export function OrderConfirmationDialog({
                 storeCode={resolveOrderStoreCodeFromOrder(order)}
                 commonNote={(order as any)?.specialInstructions || (order as any)?.special_instructions || undefined}
                 isExpressOrder={priorityInfo.isPriority}
+                orderType={(order as any)?.orderType || (order as any)?.order_type || undefined}
                 billDate={order?.createdAt ? String(order.createdAt) : undefined}
                 dueDate={order?.pickupDate ? String(order.pickupDate) : (order as any)?.dueDate ? String((order as any).dueDate) : undefined}
                 items={(order?.items || []).map((item: any) => ({

@@ -2,6 +2,7 @@ import React from 'react';
 import { DEFAULT_COMPANY_INFO, getFranchiseById } from './franchise-config';
 import { normalizeOrderStoreCode } from './order-store';
 import type { OrderCoverType } from '@shared/schema';
+import { getOrderPriorityInfo } from './order-priority';
 
 export const THERMAL_TAG_WIDTH_MM = 36;
 export const THERMAL_TAG_HEIGHT_MM = 28;
@@ -29,6 +30,7 @@ export interface ThermalTagSource {
   dueDate?: string;
   items: ThermalTagItem[];
   templateConfig?: any;
+  orderType?: string;
 }
 
 export interface PreparedThermalTag {
@@ -470,7 +472,12 @@ export const prepareThermalTags = ({
   billDate,
   dueDate,
   items,
+  orderType,
 }: ThermalTagSource): PreparedThermalTag[] => {
+  const priorityInfo = getOrderPriorityInfo({ orderType });
+  const isInstant = priorityInfo.isInstant;
+  const isExpress = priorityInfo.isExpress;
+
   const shortOrderId = formatShortOrderId(orderNumber);
   const shortOrderFit = fitUppercaseText(shortOrderId, shortOrderId, {
     baseFontMm: 2.8,
@@ -480,8 +487,16 @@ export const prepareThermalTags = ({
     shrinkFactor: 0.1,
     maxCharsAtMin: 12,
   });
+
   const branchText = resolveBranchText(franchiseId, storeCode);
-  const customerFit = fitText(formatCustomerDisplay(customerName), 'CUSTOMER', {
+  const prioritySuffix = isInstant ? " - INSTANT" : isExpress ? " - EXPRESS" : "";
+  const finalBranchText = `${branchText}${prioritySuffix}`;
+
+  const customerNameRaw = formatCustomerDisplay(customerName);
+  const priorityPrefix = isInstant ? "⚡[INSTANT] " : isExpress ? "⚡[EXPRESS] " : "";
+  const finalCustomerText = `${priorityPrefix}${customerNameRaw}`;
+
+  const customerFit = fitText(finalCustomerText, 'CUSTOMER', {
     baseFontMm: 3.75,
     minFontMm: 2.45,
     shrinkStart: 10,
@@ -489,7 +504,7 @@ export const prepareThermalTags = ({
     shrinkFactor: 0.12,
     maxCharsAtMin: 24,
   });
-  const branchFit = fitUppercaseText(branchText, branchText, {
+  const branchFit = fitUppercaseText(finalBranchText, finalBranchText, {
     baseFontMm: 2.15,
     minFontMm: 1.75,
     shrinkStart: 11,
@@ -1160,6 +1175,7 @@ export interface BagTagSource {
   totalServices: number;
   bagCount: number;
   coverType?: OrderCoverType | string;
+  orderType?: string;
 }
 
 export interface PreparedBagTag {
@@ -1206,7 +1222,12 @@ export const prepareBagTags = ({
   totalServices,
   bagCount,
   coverType,
+  orderType,
 }: BagTagSource): PreparedBagTag[] => {
+  const priorityInfo = getOrderPriorityInfo({ orderType });
+  const isInstant = priorityInfo.isInstant;
+  const isExpress = priorityInfo.isExpress;
+
   const shortOrderId = formatShortOrderId(orderNumber);
   const shortOrderFit = fitUppercaseText(shortOrderId, shortOrderId, {
     baseFontMm: 2.8,
@@ -1216,8 +1237,16 @@ export const prepareBagTags = ({
     shrinkFactor: 0.1,
     maxCharsAtMin: 12,
   });
+
   const branchText = resolveBranchText(franchiseId, storeCode);
-  const branchFit = fitUppercaseText(branchText, branchText, {
+  const prioritySuffix = isInstant ? " - INSTANT" : isExpress ? " - EXPRESS" : "";
+  const finalBranchText = `${branchText}${prioritySuffix}`;
+
+  const customerNameRaw = formatCustomerDisplay(customerName);
+  const priorityPrefix = isInstant ? "⚡[INSTANT] " : isExpress ? "⚡[EXPRESS] " : "";
+  const finalCustomerText = `${priorityPrefix}${customerNameRaw}`;
+
+  const branchFit = fitUppercaseText(finalBranchText, finalBranchText, {
     baseFontMm: 2.15,
     minFontMm: 1.75,
     shrinkStart: 11,
@@ -1225,7 +1254,7 @@ export const prepareBagTags = ({
     shrinkFactor: 0.12,
     maxCharsAtMin: 18,
   });
-  const customerFit = fitText(formatCustomerDisplay(customerName), 'CUSTOMER', {
+  const customerFit = fitText(finalCustomerText, 'CUSTOMER', {
     baseFontMm: 3.75,
     minFontMm: 2.45,
     shrinkStart: 10,

@@ -266,6 +266,7 @@ export default function PrintTags() {
                 : (order as any).dueDate
                     ? String((order as any).dueDate)
                     : undefined,
+            orderType: (order as any).orderType || (order as any).order_type || undefined,
             items: (Array.isArray(order.items) ? order.items : []).map((item: OrderItem) => ({
                 orderNumber: order.orderNumber,
                 serviceName: item.serviceName || item.customName || "Item",
@@ -322,6 +323,7 @@ export default function PrintTags() {
                 totalServices: items.length,
                 bagCount: getOrderBagCount(order),
                 coverType: getOrderCoverType(order),
+                orderType: (order as any).orderType || (order as any).order_type || undefined,
             });
         });
 
@@ -660,8 +662,8 @@ export default function PrintTags() {
                                                 }
                                             >
                                                 <div className="flex items-center gap-3 flex-wrap mb-1">
-                                                    <span className="font-black text-lg tracking-tight group-hover:text-primary transition-colors">
-                                                        {order.orderNumber}
+                                                    <span className="font-black text-lg tracking-tight group-hover:text-primary transition-colors" title={order.orderNumber}>
+                                                        #{order.orderNumber.slice(-5)}
                                                     </span>
                                                     <div className="flex items-center gap-1.5">
                                                         <Badge
