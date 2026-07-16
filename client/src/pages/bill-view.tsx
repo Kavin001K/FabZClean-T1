@@ -157,7 +157,7 @@ export default function BillView() {
     // Priority: 1. Query Param, 2. Auto-detect from order flags, 3. Default 'classic'
     const priorityInfo = getOrderPriorityInfo(order as any);
     const isExpressFromOrder = priorityInfo.isPriority;
-    const resolvedPreset: 'classic' | 'express' | 'edited' = presetParam
+    const resolvedPreset: 'classic' | 'express' | 'edited' | 'instant' = presetParam
       ? presetParam
       : priorityInfo.isInstant
         ? 'instant'
@@ -166,6 +166,9 @@ export default function BillView() {
           : 'classic';
     // Detect if this is an edited bill (preset param explicitly set, or both express + edited)
     const isEditedBill = presetParam === 'edited';
+    const instantCharge = Number((order as any).instantCharge || (order as any).instant_charge || 0);
+    const expressCharge = Number((order as any).expressCharge || (order as any).express_charge || 0);
+    const priorityCharge = priorityInfo.isInstant ? instantCharge : isExpressFromOrder ? expressCharge : 0;
 
     const subtotal = order ? (Array.isArray(order.items)
         ? order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
@@ -348,7 +351,8 @@ export default function BillView() {
         // GST Invoice
         if (enableGST) {
             const calculatedTax = order.gstAmount ? parseFloat(order.gstAmount) : (subtotal * 0.18);
-            const calculatedTotal = subtotal + calculatedTax + extraCharges + deliveryCharges - discount;
+            const calculatedTotal = subtotal + calculatedTax + extraCharges + deliveryCharges + priorityCharge - discount;
+            const billTotal = totalAmount > 0 ? totalAmount : calculatedTotal;
 
             const invoiceData = {
                 invoiceNumber: order.orderNumber,
@@ -375,11 +379,12 @@ export default function BillView() {
                 subtotal: subtotal,
                 taxAmount: calculatedTax,
                 deliveryCharges: deliveryCharges,
-                expressSurcharge: (order as any).expressSurcharge ? Number((order as any).expressSurcharge) : 0,
-                total: calculatedTotal,
+                expressSurcharge: priorityInfo.isInstant ? 0 : expressCharge,
+                instantSurcharge: priorityInfo.isInstant ? instantCharge : 0,
+                total: billTotal,
                 paymentTerms: "Due on receipt",
                 qrCode: qrCodeUrl || undefined,
-                isExpressOrder: isExpressFromOrder,
+                isExpressOrder: priorityInfo.isExpress,
                 isUpdate: isEditedBill,
                 orderType: order.orderType || (order as any).order_type,
                 preset: isEditedBill ? 'edited' as const : (priorityInfo.isInstant ? 'instant' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const)),
@@ -400,6 +405,9 @@ export default function BillView() {
 
         // Simple Invoice (Non-GST)
         else {
+            const calculatedTotal = subtotal + extraCharges + deliveryCharges + priorityCharge - discount;
+            const billTotal = totalAmount > 0 ? totalAmount : calculatedTotal;
+
             const invoiceData = {
                 invoiceNumber: order.orderNumber,
                 invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString(),
@@ -424,12 +432,13 @@ export default function BillView() {
                     hsn: undefined,
                 })),
                 subtotal: subtotal,
-                total: totalAmount, // Use stored total for simple bill
+                total: billTotal,
                 deliveryCharges: deliveryCharges,
-                expressSurcharge: (order as any).expressSurcharge ? Number((order as any).expressSurcharge) : 0,
+                expressSurcharge: priorityInfo.isInstant ? 0 : expressCharge,
+                instantSurcharge: priorityInfo.isInstant ? instantCharge : 0,
                 paymentTerms: "Due on receipt",
                 qrCode: qrCodeUrl || undefined,
-                isExpressOrder: isExpressFromOrder,
+                isExpressOrder: priorityInfo.isExpress,
                 isUpdate: isEditedBill,
                 orderType: order.orderType || (order as any).order_type,
                 preset: isEditedBill ? 'edited' as const : (priorityInfo.isInstant ? 'instant' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const)),

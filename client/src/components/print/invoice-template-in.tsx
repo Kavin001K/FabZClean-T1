@@ -15,6 +15,7 @@ import {
   Store,
   Truck,
   UserRound,
+  Zap,
 } from 'lucide-react';
 import { type InvoiceTemplatePresetKey } from '@shared/business-config';
 
@@ -56,6 +57,7 @@ export interface InvoiceData {
   taxAmount?: number | string;
   deliveryCharges?: number | string;
   expressSurcharge?: number | string;
+  instantSurcharge?: number | string;
   total: number | string;
   paymentTerms?: string;
   notes?: string;
@@ -175,6 +177,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     taxAmount = 0,
     deliveryCharges = 0,
     expressSurcharge = 0,
+    instantSurcharge = 0,
     total = 0,
     paymentTerms,
     notes,
@@ -252,12 +255,12 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       shellShadow: '0 20px 54px rgba(76, 29, 149, 0.12)',
     },
     instant: {
-      accent: '#db2777',
-      accentSoft: '#fdf2f8',
-      accentBorder: '#fbcfe8',
-      headerGradient: 'linear-gradient(135deg, #db2777 0%, #be185d 100%)',
-      pageBackground: '#fffcfd',
-      shellShadow: '0 20px 54px rgba(219, 39, 119, 0.16)',
+      accent: '#7c3aed',
+      accentSoft: '#f5f3ff',
+      accentBorder: '#c4b5fd',
+      headerGradient: 'linear-gradient(135deg, #5b21b6 0%, #7c3aed 55%, #db2777 100%)',
+      pageBackground: '#fbf7ff',
+      shellShadow: '0 20px 54px rgba(92, 38, 211, 0.18)',
     },
   };
   const visual = presetVisuals[visualPreset] || presetVisuals.classic;
@@ -293,7 +296,10 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
   const serviceSubtotal = safeNumber(subtotal) > 0 ? safeNumber(subtotal) : itemSubtotal;
   const deliveryTotal = Math.max(0, safeNumber(deliveryCharges));
   const expressTotal = Math.max(0, safeNumber(expressSurcharge));
-  const chargeSubtotal = deliveryTotal + expressTotal;
+  const instantTotal = Math.max(0, safeNumber(instantSurcharge));
+  const priorityCharge = isInstant ? instantTotal : expressTotal;
+  const priorityChargeLabel = isInstant ? 'Instant Charge' : 'Express Surcharge';
+  const chargeSubtotal = deliveryTotal + priorityCharge;
   const derivedTax = Math.max(0, safeNumber(taxAmount) || (enableGST ? Math.max(0, safeNumber(total) - serviceSubtotal - chargeSubtotal) : 0));
   const grandTotal = Math.max(0, safeNumber(total) || (serviceSubtotal + chargeSubtotal + derivedTax));
   const cgstAmount = enableGST ? derivedTax / 2 : 0;
@@ -317,6 +323,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
   // 1. Normal Bill (classic), 2. Express Bill, 3. Edited Bill, 4. Express Edited Bill
   const documentTitle = isExpressEdited
     ? 'Express Edited Bill'
+    : visualPreset === 'instant'
+      ? 'Instant Priority Bill'
     : visualPreset === 'express'
       ? 'Express Bill'
       : isEditedInvoice
@@ -324,6 +332,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
         : 'Invoice';
   const heroTitle = isExpressEdited
     ? 'Revised express order'
+    : visualPreset === 'instant'
+      ? 'Very high priority handling'
     : visualPreset === 'express'
       ? 'Priority processing enabled'
       : isEditedInvoice
@@ -331,11 +341,26 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
         : 'Ready for billing and collection';
   const heroCopy = isExpressEdited
     ? 'This document supersedes the previous express bill and reflects updated order items, quantities, or pricing.'
+    : visualPreset === 'instant'
+      ? 'This order has been pushed to the front of the queue. Instant charges are included in the total, and delivery is expected within 24-48 hours.'
     : visualPreset === 'express'
       ? 'Fast-turnaround handling is reflected on this bill. Pickup timing and totals already include express service uplift.'
       : isEditedInvoice
         ? 'This document supersedes the previous bill for the same order and reflects the latest confirmed order changes.'
         : 'This preset keeps billing clean, branded, and easy to scan at the counter.';
+
+  const headerBadgeLabel = visualPreset === 'instant'
+    ? 'Instant Priority'
+    : isExpressOrder
+      ? 'Express Order'
+      : null;
+  const headerSupportBadgeLabel = visualPreset === 'instant'
+    ? '24-48H TURNAROUND'
+    : isExpressOrder
+      ? 'FAST TRACK'
+      : null;
+  const priorityChargeDisplay = priorityCharge > 0 ? formatIndianCurrency(priorityCharge) : null;
+  const HeaderBadgeIcon = visualPreset === 'instant' ? Zap : Clock3;
 
   return (
     <div
@@ -354,7 +379,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
         }
 
         .invoice-shell {
-          background: #ffffff;
+          background: ${visual.pageBackground};
           box-shadow: ${shadow};
           min-height: 289mm;
           overflow: hidden;
@@ -432,7 +457,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           <header
             className="invoice-section"
             style={{
-              background: `linear-gradient(135deg, ${isExpressOrder ? '#ea580c' : '#059669'} 0%, ${isExpressOrder ? '#f97316' : '#10b981'} 100%)`,
+              background: visual.headerGradient,
               color: '#ffffff',
               padding: '12px 18px',
             }}
@@ -463,7 +488,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
 
               <div style={{ textAlign: 'right', minWidth: '220px' }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                  {isExpressOrder && (
+                  {headerBadgeLabel && (
                     <span
                       style={{
                         display: 'inline-flex',
@@ -472,15 +497,36 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                         padding: '5px 10px',
                         borderRadius: '999px',
                         background: 'rgba(255,255,255,0.92)',
-                        color: '#c2410c',
+                        color: visualPreset === 'instant' ? '#5b21b6' : '#c2410c',
                         fontSize: '10px',
                         fontWeight: 900,
                         textTransform: 'uppercase',
                         letterSpacing: '0.12em',
                       }}
                     >
-                      <Clock3 size={12} strokeWidth={2.3} />
-                      Express Order
+                      <HeaderBadgeIcon size={12} strokeWidth={2.3} />
+                      {headerBadgeLabel}
+                    </span>
+                  )}
+                  {headerSupportBadgeLabel && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '5px 10px',
+                        borderRadius: '999px',
+                        background: 'rgba(255,255,255,0.14)',
+                        border: '1px solid rgba(255,255,255,0.22)',
+                        color: '#ffffff',
+                        fontSize: '10px',
+                        fontWeight: 900,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.12em',
+                      }}
+                    >
+                      <Zap size={12} strokeWidth={2.3} />
+                      {headerSupportBadgeLabel}
                     </span>
                   )}
                   {isEditedInvoice && (
@@ -531,7 +577,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             </div>
           </header>
 
-          {(visualPreset === 'express' || isEditedInvoice) && (
+          {(visualPreset === 'express' || visualPreset === 'instant' || isEditedInvoice) && (
             <section className="invoice-section" style={{ padding: '10px 18px 0' }}>
               <div
                 className="invoice-card"
@@ -550,6 +596,29 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   <p style={sectionTitleStyle(accent)}>{documentTitle}</p>
                   <p style={{ margin: '8px 0 0', fontSize: '18px', fontWeight: 900, color: headingInk }}>{heroTitle}</p>
                   <p style={{ margin: '6px 0 0', fontSize: '12px', lineHeight: 1.7, color: bodyInk, maxWidth: '540px' }}>{heroCopy}</p>
+                  {visualPreset === 'instant' && priorityChargeDisplay && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '5px 10px',
+                        borderRadius: '999px',
+                        background: '#ffffff',
+                        color: accent,
+                        fontSize: '10px',
+                        fontWeight: 900,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.12em',
+                      }}>
+                        <Zap size={12} strokeWidth={2.3} />
+                        Instant charge included
+                      </span>
+                      <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 700 }}>
+                        {priorityChargeDisplay}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div
                   style={{
@@ -562,11 +631,16 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   }}
                 >
                   <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-                    {isExpressEdited ? 'Revision Date' : visualPreset === 'express' ? 'Priority By' : 'Revision Date'}
+                    {isExpressEdited ? 'Revision Date' : visualPreset === 'express' ? 'Priority By' : visualPreset === 'instant' ? 'Target Window' : 'Revision Date'}
                   </p>
                   <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 900, color: accent }}>
                     {formatDisplayDate(isExpressEdited ? invoiceDate : (visualPreset === 'express' ? dueDate : invoiceDate))}
                   </p>
+                  {visualPreset === 'instant' && (
+                    <p style={{ margin: '6px 0 0', fontSize: '11px', color: mutedInk, lineHeight: 1.45 }}>
+                      Priority delivery planned within 24-48 hours.
+                    </p>
+                  )}
                 </div>
               </div>
             </section>
@@ -853,7 +927,47 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                       overflow: 'visible',
                     }}
                   >
-                    {isExpressOrder ? (
+                    {visualPreset === 'instant' ? (
+                      /* ── INSTANT PRIORITY SVG stamp ── */
+                      <svg
+                        width="188"
+                        height="155"
+                        viewBox="0 0 188 155"
+                        overflow="visible"
+                        style={{ display: 'block', transform: 'rotate(-5deg)' }}
+                      >
+                        <circle cx="98" cy="77" r="72" fill="#faf5ff" stroke="#7c3aed" strokeWidth="3"/>
+                        <circle cx="98" cy="77" r="63" fill="none" stroke="#7c3aed" strokeWidth="1.5"/>
+
+                        <text x="98" y="24" textAnchor="middle"
+                          fontFamily="'Arial Black', Arial, sans-serif"
+                          fontSize="11" fontWeight="900" fill="#7c3aed" letterSpacing="4">INSTANT</text>
+
+                        <line x1="44" y1="33" x2="64" y2="33" stroke="#7c3aed" strokeWidth="1.4"/>
+                        <text x="98" y="37" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#7c3aed" letterSpacing="6">⚡ ⚡ ⚡</text>
+                        <line x1="132" y1="33" x2="152" y2="33" stroke="#7c3aed" strokeWidth="1.4"/>
+
+                        <rect x="-20" y="46" width="260" height="3" fill="#7c3aed"/>
+
+                        <text
+                          x="6" y="92"
+                          textAnchor="start"
+                          textLength="180"
+                          lengthAdjust="spacingAndGlyphs"
+                          fontFamily="Impact, 'Arial Black', Arial, sans-serif"
+                          fontSize="44" fontWeight="900" fill="#7c3aed">PRIORITY</text>
+
+                        <rect x="-20" y="98" width="260" height="3" fill="#7c3aed"/>
+
+                        <text x="98" y="114" textAnchor="middle"
+                          fontFamily="'Arial Black', Arial, sans-serif"
+                          fontSize="10" fontWeight="900" fill="#7c3aed" letterSpacing="3">24-48 HOURS</text>
+
+                        <line x1="44" y1="124" x2="64" y2="124" stroke="#7c3aed" strokeWidth="1.4"/>
+                        <text x="98" y="128" textAnchor="middle" fontFamily="Arial" fontSize="10" fill="#7c3aed" letterSpacing="6">⚡ ⚡ ⚡</text>
+                        <line x1="132" y1="124" x2="152" y2="124" stroke="#7c3aed" strokeWidth="1.4"/>
+                      </svg>
+                    ) : isExpressOrder ? (
                       /* ── EXPRESS PRIORITY SVG stamp ── */
                       <svg
                         width="188"
@@ -968,10 +1082,10 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                         <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(deliveryTotal)}</strong>
                       </div>
                     )}
-                    {expressTotal > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#c2410c' }}>
-                        <span style={{ fontWeight: 700 }}>Express Surcharge</span>
-                        <strong style={{ fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(expressTotal)}</strong>
+                    {priorityCharge > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: accent }}>
+                        <span style={{ fontWeight: 700, color: accent }}>{priorityChargeLabel}</span>
+                        <strong style={{ fontFamily: '"IBM Plex Mono", monospace', color: accent }}>{formatIndianCurrency(priorityCharge)}</strong>
                       </div>
                     )}
                     {enableGST && (
@@ -990,7 +1104,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 </div>
 
                 {/* ── RED DIVIDER ── */}
-                <div style={{ height: '3px', background: isExpressOrder ? '#c2410c' : accent, margin: '0' }} />
+                <div style={{ height: '3px', background: accent, margin: '0' }} />
 
                 {/* ── GRAND TOTAL ROW ── */}
                 <div
@@ -1018,7 +1132,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     style={{
                       fontSize: '36px',
                       fontWeight: 900,
-                      color: isExpressOrder ? '#c2410c' : accent,
+                      color: accent,
                       fontFamily: '"IBM Plex Mono", monospace',
                       lineHeight: 1,
                       whiteSpace: 'nowrap',

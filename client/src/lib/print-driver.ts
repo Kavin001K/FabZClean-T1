@@ -197,6 +197,7 @@ export interface InvoicePrintData {
   tax: number;
   discount?: number;
   expressSurcharge?: number;
+  instantSurcharge?: number;
   total: number;
   paymentMethod?: string;
   paymentStatus?: string;
@@ -216,7 +217,7 @@ export interface InvoicePrintData {
 import { getFranchiseById, getFormattedAddress } from './franchise-config';
 
 const isPresetKey = (value: unknown): value is InvoiceTemplatePresetKey =>
-  value === 'classic' || value === 'modern' || value === 'compact' || value === 'express' || value === 'edited';
+  value === 'classic' || value === 'modern' || value === 'compact' || value === 'express' || value === 'edited' || value === 'instant';
 
 type InvoiceRendererMode = 'standard' | 'template';
 type StandardInvoiceVariantKey =
@@ -231,6 +232,7 @@ const PRESET_TEMPLATE_MAP: Record<InvoiceTemplatePresetKey, string> = {
   compact: 'compact-invoice',
   express: 'express-invoice',
   edited: 'edited-invoice',
+  instant: 'invoice',
 };
 
 const resolveTemplateIdFromPreset = (presetKey: InvoiceTemplatePresetKey): string =>
@@ -501,6 +503,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     : priorityInfo.isExpress
       ? subtotal * 0.5
       : 0;
+  const instantSurcharge = priorityInfo.isInstant ? subtotal : 0;
   const total = subtotal + tax + expressSurcharge;
 
   // Generate invoice number with franchise prefix
@@ -559,6 +562,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     subtotal,
     tax,
     expressSurcharge,
+    instantSurcharge,
     total,
     paymentMethod: order.paymentMethod || 'Cash',
     paymentStatus: order.paymentStatus || order.status || 'Pending',
@@ -567,7 +571,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
       ? 'GST Invoice. Tax is calculated at applicable rates. Payment due within 30 days.'
       : 'Payment due within 30 days of invoice date.',
     status: order.status,
-    isExpressOrder: priorityInfo.isPriority,
+    isExpressOrder: priorityInfo.isExpress,
     isUpdate,
     paymentBreakdown,
   };
