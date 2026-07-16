@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins, Users, Banknote, Smartphone, CreditCard, Building, FileText, Printer } from "lucide-react";
+import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins, Users, Banknote, Smartphone, CreditCard, Building, FileText, Printer, Download } from "lucide-react";
 import { PageTransition } from "@/components/ui/page-transition";
 import { InlineLoading } from "@/components/ui/loading-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +43,7 @@ import { authorizedFetch } from "@/lib/data-service";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { exportToExcel } from "@/lib/excel-export";
 import { readWalletCustomersCache, writeWalletCustomersCache } from "@/lib/wallet-cache";
 import { getLedgerDirection } from "@/lib/wallet-ledger";
 import {
@@ -285,6 +286,29 @@ export default function WalletManagementPage() {
     invalidateWalletQueries(queryClient, selectedCustomer?.id);
   };
 
+  const handleExportExcel = () => {
+    const dataToExport = filteredRows.map((row) => ({
+      "Customer Name": row.name,
+      "Phone": row.phone || "N/A",
+      "Email": row.email || "N/A",
+      "Outstanding Balance (Rs.)": row.outstanding,
+      "Credit Limit (Rs.)": row.creditLimit,
+      "Wallet Balance (Rs.)": row.walletBalance,
+      "Status": row.isExceeded ? "Exceeded Limit" : row.isClear ? "Clear" : row.walletBalance > 0 ? "Prepaid" : "Outstanding",
+    }));
+
+    exportToExcel({
+      data: dataToExport,
+      fileName: `Wallet_Ledger_${filter}_${search.trim().replace(/\s+/g, '_') || 'all'}`,
+      sheetName: "Wallet Ledger"
+    });
+
+    toast({
+      title: "Export Successful",
+      description: `Excel export with ${filteredRows.length} customers generated.`,
+    });
+  };
+
   const resetDialogState = () => {
     setAmount("");
     setPaymentMethod("CASH");
@@ -455,6 +479,10 @@ export default function WalletManagementPage() {
               </p>
             </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExportExcel} className="flex-1 sm:w-auto shadow-sm hover:shadow-md transition-all text-slate-700 hover:text-primary">
+              <Download className="mr-2 h-4 w-4" />
+              Export Excel
+            </Button>
             <Button variant="outline" onClick={refreshData} className="flex-1 sm:w-auto shadow-sm hover:shadow-md transition-all">
               <RefreshCw className="mr-2 h-4 w-4" />
               Sync Data

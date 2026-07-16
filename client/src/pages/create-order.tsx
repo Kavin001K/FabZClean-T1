@@ -2010,159 +2010,11 @@ export default function CreateOrder() {
             </Card>
           </motion.div>
 
-          {/* Fulfillment Type */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.35 }}
-          >
-            <Card className="overflow-hidden border transition-all duration-300 dark:border-slate-700/50 dark:bg-slate-900/40 shadow-sm">
-              <CardHeader className="bg-slate-50/50 dark:bg-primary/10 border-b dark:border-primary/20 pb-4">
-                <CardTitle className="flex items-center text-lg font-bold text-slate-900 dark:text-white">
-                  <Truck className="h-5 w-5 mr-2 text-primary" />
-                  Fulfillment Type
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                <Tabs 
-                  defaultValue="pickup" 
-                  value={fulfillmentType} 
-                  onValueChange={(v) => {
-                    const type = v as 'pickup' | 'delivery';
-                    setFulfillmentType(type);
-                    if (type === 'delivery' && deliveryCharges === 0) {
-                      setDeliveryCharges(50);
-                    } else if (type === 'pickup') {
-                      setDeliveryCharges(0);
-                    }
-                  }}
-                  className="w-full"
-                >
-                  <TabsList className="grid grid-cols-2 w-full h-14 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-lg shadow-sm">
-                    <TabsTrigger value="pickup" className="data-[state=active]:bg-white dark:data-[state=active]:bg-primary data-[state=active]:text-primary dark:data-[state=active]:text-white data-[state=active]:shadow-md font-bold gap-2 rounded-md transition-all text-sm">
-                      <Store className="h-4 w-4" /> Store Pickup
-                    </TabsTrigger>
-                    <TabsTrigger value="delivery" className="data-[state=active]:bg-white dark:data-[state=active]:bg-primary data-[state=active]:text-primary dark:data-[state=active]:text-white data-[state=active]:shadow-md font-bold gap-2 rounded-md transition-all text-sm">
-                      <MapPin className="h-4 w-4" /> Home Delivery
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="pickup" className="pt-4 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <div className="rounded-xl border bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50 p-4 flex items-start gap-4">
-                      <div className="bg-emerald-100 dark:bg-emerald-900/50 p-3 rounded-lg shadow-sm">
-                        <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">Customer will pick up from store</p>
-                        <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 leading-relaxed">No delivery charges apply for store pickup.</p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="delivery" className="pt-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Delivery Address</Label>
-                          {foundCustomer && (
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="h-7 text-[10px] font-semibold gap-1.5 px-3 shadow-sm hover:shadow-md transition-all bg-primary/10 hover:bg-primary/20 text-primary dark:bg-primary/20 dark:hover:bg-primary/30"
-                              onClick={() => setDeliveryAddress(parseAndFormatAddress(foundCustomer.address))}
-                            >
-                              <User className="h-3.5 w-3.5" /> Auto-fill from Profile
-                            </Button>
-                          )}
-                        </div>
-                        {customerAddresses.length > 0 && (
-                          <div className="space-y-2">
-                            <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Saved Addresses</Label>
-                            <Select
-                              value={selectedCustomerAddressId}
-                              onValueChange={(value) => {
-                                setSelectedCustomerAddressId(value);
-                                if (value === 'manual') return;
-                                const selected = customerAddresses.find((entry) => entry.id === value);
-                                if (!selected) return;
-                                const formatted = [selected.line1, selected.line2, selected.city, selected.state, selected.pincode, selected.country]
-                                  .filter(Boolean)
-                                  .join(', ');
-                                setDeliveryAddress(formatted);
-                              }}
-                            >
-                              <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                                <SelectValue placeholder="Select saved address" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="manual">Manual address</SelectItem>
-                                {customerAddresses.map((entry) => (
-                                  <SelectItem key={entry.id} value={entry.id}>
-                                    {entry.label}: {entry.line1}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                        <div className="relative group">
-                          <Textarea 
-                            placeholder="Enter detailed delivery address..." 
-                            value={deliveryAddress}
-                            onChange={(e) => {
-                              if (selectedCustomerAddressId !== 'manual') {
-                                setSelectedCustomerAddressId('manual');
-                              }
-                              setDeliveryAddress(e.target.value);
-                            }}
-                            className="min-h-[100px] sm:min-h-[120px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-primary/20 focus:border-primary dark:focus:border-primary transition-all text-sm leading-relaxed shadow-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Delivery Charges (Rs. )</Label>
-                        <div className="relative group">
-                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-primary transition-colors" />
-                          <Input 
-                            type="number" 
-                            min="0"
-                            placeholder="0.00"
-                            value={deliveryCharges || ''}
-                            onChange={(e) => setDeliveryCharges(safeParseFloat(e.target.value))}
-                            className="pl-9 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-primary/20 focus:border-primary dark:focus:border-primary transition-all font-bold text-lg"
-                          />
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {[0, 20, 30, 50].map(amt => (
-                            <Button 
-                              key={amt}
-                              type="button"
-                              variant="outline" 
-                              size="sm" 
-                              className={cn(
-                                "h-8 px-4 text-xs font-bold transition-all rounded-lg dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white",
-                                deliveryCharges === amt ? "bg-primary text-white border-primary" : "hover:border-primary hover:text-primary"
-                              )}
-                              onClick={() => setDeliveryCharges(amt)}
-                            >
-                              Rs. {amt}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </motion.div>
-
           {/* Payment Adjustments */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.4 }}
+            transition={{ duration: 0.3, delay: 0.35 }}
           >
             <Card>
               <CardHeader>
@@ -2357,6 +2209,154 @@ export default function CreateOrder() {
             </Card>
           </motion.div>
           
+          {/* Fulfillment Type */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
+          >
+            <Card className="overflow-hidden border transition-all duration-300 dark:border-slate-700/50 dark:bg-slate-900/40 shadow-sm">
+              <CardHeader className="bg-slate-50/50 dark:bg-primary/10 border-b dark:border-primary/20 pb-4">
+                <CardTitle className="flex items-center text-lg font-bold text-slate-900 dark:text-white">
+                  <Truck className="h-5 w-5 mr-2 text-primary" />
+                  Fulfillment Type
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <Tabs 
+                  defaultValue="pickup" 
+                  value={fulfillmentType} 
+                  onValueChange={(v) => {
+                    const type = v as 'pickup' | 'delivery';
+                    setFulfillmentType(type);
+                    if (type === 'delivery' && deliveryCharges === 0) {
+                      setDeliveryCharges(50);
+                    } else if (type === 'pickup') {
+                      setDeliveryCharges(0);
+                    }
+                  }}
+                  className="w-full"
+                >
+                  <TabsList className="grid grid-cols-2 w-full h-14 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-lg shadow-sm">
+                    <TabsTrigger value="pickup" className="data-[state=active]:bg-white dark:data-[state=active]:bg-primary data-[state=active]:text-primary dark:data-[state=active]:text-white data-[state=active]:shadow-md font-bold gap-2 rounded-md transition-all text-sm">
+                      <Store className="h-4 w-4" /> Store Pickup
+                    </TabsTrigger>
+                    <TabsTrigger value="delivery" className="data-[state=active]:bg-white dark:data-[state=active]:bg-primary data-[state=active]:text-primary dark:data-[state=active]:text-white data-[state=active]:shadow-md font-bold gap-2 rounded-md transition-all text-sm">
+                      <MapPin className="h-4 w-4" /> Home Delivery
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="pickup" className="pt-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="rounded-xl border bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50 p-4 flex items-start gap-4">
+                      <div className="bg-emerald-100 dark:bg-emerald-900/50 p-3 rounded-lg shadow-sm">
+                        <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">Customer will pick up from store</p>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 leading-relaxed">No delivery charges apply for store pickup.</p>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="delivery" className="pt-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Delivery Address</Label>
+                          {foundCustomer && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-7 text-[10px] font-semibold gap-1.5 px-3 shadow-sm hover:shadow-md transition-all bg-primary/10 hover:bg-primary/20 text-primary dark:bg-primary/20 dark:hover:bg-primary/30"
+                              onClick={() => setDeliveryAddress(parseAndFormatAddress(foundCustomer.address))}
+                            >
+                              <User className="h-3.5 w-3.5" /> Auto-fill from Profile
+                            </Button>
+                          )}
+                        </div>
+                        {customerAddresses.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Saved Addresses</Label>
+                            <Select
+                              value={selectedCustomerAddressId}
+                              onValueChange={(value) => {
+                                setSelectedCustomerAddressId(value);
+                                if (value === 'manual') return;
+                                const selected = customerAddresses.find((entry) => entry.id === value);
+                                if (!selected) return;
+                                const formatted = [selected.line1, selected.line2, selected.city, selected.state, selected.pincode, selected.country]
+                                  .filter(Boolean)
+                                  .join(', ');
+                                setDeliveryAddress(formatted);
+                              }}
+                            >
+                              <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                                <SelectValue placeholder="Select saved address" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="manual">Manual address</SelectItem>
+                                {customerAddresses.map((entry) => (
+                                  <SelectItem key={entry.id} value={entry.id}>
+                                    {entry.label}: {entry.line1}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        <div className="relative group">
+                          <Textarea 
+                            placeholder="Enter detailed delivery address..." 
+                            value={deliveryAddress}
+                            onChange={(e) => {
+                              if (selectedCustomerAddressId !== 'manual') {
+                                setSelectedCustomerAddressId('manual');
+                              }
+                              setDeliveryAddress(e.target.value);
+                            }}
+                            className="min-h-[100px] sm:min-h-[120px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-primary/20 focus:border-primary dark:focus:border-primary transition-all text-sm leading-relaxed shadow-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Delivery Charges (Rs. )</Label>
+                        <div className="relative group">
+                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-primary transition-colors" />
+                          <Input 
+                            type="number" 
+                            min="0"
+                            placeholder="0.00"
+                            value={deliveryCharges || ''}
+                            onChange={(e) => setDeliveryCharges(safeParseFloat(e.target.value))}
+                            className="pl-9 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-primary/20 focus:border-primary dark:focus:border-primary transition-all font-bold text-lg"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {[0, 20, 30, 50].map(amt => (
+                            <Button 
+                              key={amt}
+                              type="button"
+                              variant="outline" 
+                              size="sm" 
+                              className={cn(
+                                "h-8 px-4 text-xs font-bold transition-all rounded-lg dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white",
+                                deliveryCharges === amt ? "bg-primary text-white border-primary" : "hover:border-primary hover:text-primary"
+                              )}
+                              onClick={() => setDeliveryCharges(amt)}
+                            >
+                              Rs. {amt}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* Wallet Balance Usage */}
           <AnimatePresence>
             {foundCustomer && (Number(foundCustomer.walletBalanceCache || 0) > 0 || useWallet) && (
@@ -2621,7 +2621,12 @@ export default function CreateOrder() {
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val === '' || /^\d+$/.test(val)) {
-                          setBagCount(val === '' ? 1 : Math.max(1, parseInt(val)));
+                          setBagCount(val === '' ? '' : parseInt(val));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (bagCount === '' || bagCount === 0) {
+                          setBagCount(1);
                         }
                       }}
                       className="h-8 w-14 text-center font-bold text-sm bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg"

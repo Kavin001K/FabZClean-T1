@@ -201,6 +201,20 @@ export function OrderConfirmationDialog({
         setWhatsappStatus('idle');
     }, [open, order]);
 
+    const markTagsAsPrinted = async () => {
+        if (!order?.id) return;
+        try {
+            await authorizedFetch(`/api/orders/${order.id}/tags-printed`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            queryClient.invalidateQueries({ queryKey: [`/api/orders/${order.id}`] });
+            queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+        } catch (err) {
+            console.error('Failed to mark tags as printed:', err);
+        }
+    };
+
     const handlePrintBill = async () => {
         if (!order) return;
 
@@ -226,6 +240,9 @@ export function OrderConfirmationDialog({
 
             // Use the print driver to print the invoice
             await printDriver.printInvoice(invoiceData);
+
+            // Mark tags as printed automatically when printing bill
+            await markTagsAsPrinted();
 
             toast({
                 title: enableGST ? "GST Invoice Printed" : "Invoice Printed",
@@ -256,6 +273,8 @@ export function OrderConfirmationDialog({
             return;
         }
 
+        // Mark tags as printed automatically when printing tags
+        markTagsAsPrinted();
         setShowTagPrint(true);
     };
 

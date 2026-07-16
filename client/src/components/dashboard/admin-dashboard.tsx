@@ -834,16 +834,6 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
-            {/* Customer growth insight */}
-            <div className="grid grid-cols-1 gap-6 2xl:auto-rows-fr 2xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.35fr)]">
-                <div className="h-full">
-                    <DashboardNewCustomers />
-                </div>
-                <div className="h-full">
-                    <WeatherWidget />
-                </div>
-            </div>
-
             {/* On-Time Operational Readiness Chart & Analysis */}
             <Card className="border-border bg-card shadow-sm rounded-2xl p-6">
                 <CardHeader className="pb-3 border-b border-border/50">
@@ -961,6 +951,16 @@ export default function AdminDashboard() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Customer growth insight */}
+            <div className="grid grid-cols-1 gap-6 2xl:auto-rows-fr 2xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.35fr)]">
+                <div className="h-full">
+                    <DashboardNewCustomers />
+                </div>
+                <div className="h-full">
+                    <WeatherWidget />
+                </div>
+            </div>
 
             {/* Interactive Details Dialog */}
             <Dialog open={activeDetailsDialog !== null} onOpenChange={(open) => !open && setActiveDetailsDialog(null)}>

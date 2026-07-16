@@ -722,6 +722,54 @@ export default function ReportsPage() {
       note: expense.note || '',
     }));
 
+    const storeRows = (overview.franchisePerformance || []).map((store) => ({
+      franchiseName: store.franchiseName,
+      franchiseCode: store.franchiseCode,
+      totalRevenue: store.totalRevenue,
+      totalOrders: store.totalOrders,
+      totalCustomers: store.totalCustomers,
+      avgOrderValue: store.avgOrderValue,
+      creditOutstanding: store.creditOutstanding,
+      topService: store.topService,
+    }));
+
+    const serviceRows = (overview.topServices || []).map((svc) => ({
+      name: svc.name,
+      orderCount: svc.orderCount,
+      itemCount: svc.itemCount,
+      revenue: svc.revenue,
+      customersCount: svc.customersCount,
+      avgTicket: svc.avgTicket,
+    }));
+
+    const customerRows = (overview.topCustomers || []).map((cust) => ({
+      customerName: cust.customerName,
+      phone: cust.phone,
+      orders: cust.orders,
+      revenue: cust.revenue,
+      avgOrderValue: cust.avgOrderValue,
+      creditBalance: cust.creditBalance,
+      walletBalance: cust.walletBalance,
+      lastOrderAt: cust.lastOrderAt ? formatDate(cust.lastOrderAt) : '',
+    }));
+
+    const teamRows = (overview.employeePerformance || []).map((emp) => ({
+      name: emp.name,
+      role: emp.role,
+      storeCode: emp.storeCode,
+      totalOrders: emp.totalOrders,
+      revenueGenerated: emp.revenueGenerated,
+      completionRate: emp.completionRate,
+    }));
+
+    const dailyRows = (overview.dailySummary || []).map((day) => ({
+      date: formatDate(day.date),
+      totalOrders: day.totalOrders,
+      completedOrders: day.completedOrders,
+      totalRevenue: day.totalRevenue,
+      averageOrderValue: day.averageOrderValue,
+    }));
+
     exportToExcelAdvanced({
       filename: `FabClean_Report_${overview.meta.startDate}_${overview.meta.endDate}`,
       companyName: 'Fab Clean',
@@ -755,6 +803,69 @@ export default function ReportsPage() {
             { header: 'Note', key: 'note', width: 36, align: 'left' },
           ],
           data: expenseRows,
+        },
+        {
+          name: 'Stores Performance',
+          columns: [
+            { header: 'Store Name', key: 'franchiseName', width: 28, align: 'left' },
+            { header: 'Store Code', key: 'franchiseCode', width: 14, align: 'left' },
+            { header: 'Total Revenue', key: 'totalRevenue', width: 18, format: 'currency', align: 'right' },
+            { header: 'Total Orders', key: 'totalOrders', width: 15, format: 'number', align: 'right' },
+            { header: 'Active Customers', key: 'totalCustomers', width: 18, format: 'number', align: 'right' },
+            { header: 'Average Order Value', key: 'avgOrderValue', width: 20, format: 'currency', align: 'right' },
+            { header: 'Outstanding Credit', key: 'creditOutstanding', width: 20, format: 'currency', align: 'right' },
+            { header: 'Top Service', key: 'topService', width: 22, align: 'left' },
+          ],
+          data: storeRows,
+        },
+        {
+          name: 'Services Mix',
+          columns: [
+            { header: 'Service Name', key: 'name', width: 25, align: 'left' },
+            { header: 'Order Count', key: 'orderCount', width: 15, format: 'number', align: 'right' },
+            { header: 'Item Count', key: 'itemCount', width: 15, format: 'number', align: 'right' },
+            { header: 'Total Revenue', key: 'revenue', width: 18, format: 'currency', align: 'right' },
+            { header: 'Unique Customers', key: 'customersCount', width: 18, format: 'number', align: 'right' },
+            { header: 'Average Ticket', key: 'avgTicket', width: 18, format: 'currency', align: 'right' },
+          ],
+          data: serviceRows,
+        },
+        {
+          name: 'Top Customers',
+          columns: [
+            { header: 'Customer Name', key: 'customerName', width: 25, align: 'left' },
+            { header: 'Phone', key: 'phone', width: 16, align: 'left' },
+            { header: 'Total Orders', key: 'orders', width: 15, format: 'number', align: 'right' },
+            { header: 'Total Revenue', key: 'revenue', width: 18, format: 'currency', align: 'right' },
+            { header: 'Average Order Value', key: 'avgOrderValue', width: 20, format: 'currency', align: 'right' },
+            { header: 'Outstanding Credit', key: 'creditBalance', width: 20, format: 'currency', align: 'right' },
+            { header: 'Wallet Balance', key: 'walletBalance', width: 18, format: 'currency', align: 'right' },
+            { header: 'Last Order Date', key: 'lastOrderAt', width: 18, align: 'left' },
+          ],
+          data: customerRows,
+        },
+        {
+          name: 'Team Performance',
+          columns: [
+            { header: 'Name', key: 'name', width: 25, align: 'left' },
+            { header: 'Role', key: 'role', width: 18, align: 'left' },
+            { header: 'Store Code', key: 'storeCode', width: 14, align: 'left' },
+            { header: 'Orders Handled', key: 'totalOrders', width: 16, format: 'number', align: 'right' },
+            { header: 'Revenue Generated', key: 'revenueGenerated', width: 20, format: 'currency', align: 'right' },
+            { header: 'Completion Rate (%)', key: 'completionRate', width: 20, format: 'number', align: 'right' },
+          ],
+          data: teamRows,
+        },
+        {
+          name: 'Daily Trends',
+          columns: [
+            { header: 'Date', key: 'date', width: 16, align: 'left' },
+            { header: 'Orders', key: 'totalOrders', width: 12, format: 'number', align: 'right' },
+            { header: 'Completed Orders', key: 'completedOrders', width: 18, format: 'number', align: 'right' },
+            { header: 'Revenue', key: 'totalRevenue', width: 18, format: 'currency', align: 'right' },
+            { header: 'Average Order Value', key: 'averageOrderValue', width: 20, format: 'currency', align: 'right' },
+          ],
+          data: dailyRows,
         },
       ],
     });

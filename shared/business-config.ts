@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const invoiceTemplatePresetKeys = ["classic", "modern", "compact", "express", "edited"] as const;
+export const invoiceTemplatePresetKeys = ["classic", "modern", "compact", "express", "edited", "instant"] as const;
 export type InvoiceTemplatePresetKey = (typeof invoiceTemplatePresetKeys)[number];
 
 export const tagTemplateLayoutKeys = ["thermal_compact"] as const;

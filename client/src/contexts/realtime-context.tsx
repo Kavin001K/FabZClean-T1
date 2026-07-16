@@ -80,6 +80,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     if (type.startsWith('customer_')) {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['customer', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-management'] });
       toast({ title: 'Customers updated', description: 'The list of customers has been updated in real-time.' });
     }
 
@@ -105,6 +106,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     if (type.startsWith('credit_') || type.startsWith('wallet_')) {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customer', data?.id] });
       queryClient.invalidateQueries({ queryKey: ['credits'] });
       queryClient.invalidateQueries({ queryKey: ['wallet-management'] });
     }

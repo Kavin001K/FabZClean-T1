@@ -62,6 +62,7 @@ export interface InvoiceData {
   qrCode?: string;
   signature?: string;
   isExpressOrder?: boolean;
+  orderType?: string;
   fulfillmentType?: string;
   deliveryAddress?: unknown;
   paymentBreakdown?: {
@@ -186,18 +187,22 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     paymentBreakdown,
     preset = 'classic',
     isUpdate = false,
+    orderType,
   } = data;
 
   const franchise = getFranchiseById(franchiseId);
   const usesEditedVisual = preset === 'edited';
   const isEditedInvoice = usesEditedVisual || isUpdate;
+  const isInstant = preset === 'instant' || orderType === 'instant' || data.orderType === 'instant';
   // When both express AND edited, use express visuals (orange) but still show edited seal
   const isExpressEdited = isExpressOrder && isEditedInvoice;
-  const visualPreset: InvoiceTemplatePresetKey = isExpressEdited
-    ? 'express' // Express takes visual priority for the header gradient
-    : usesEditedVisual
-      ? 'edited'
-      : (preset === 'express' || isExpressOrder ? 'express' : preset);
+  const visualPreset: InvoiceTemplatePresetKey = isInstant
+    ? 'instant'
+    : isExpressEdited
+      ? 'express' // Express takes visual priority for the header gradient
+      : usesEditedVisual
+        ? 'edited'
+        : (preset === 'express' || isExpressOrder ? 'express' : preset);
   const presetVisuals: Record<InvoiceTemplatePresetKey, {
     accent: string;
     accentSoft: string;
@@ -245,6 +250,14 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       headerGradient: 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
       pageBackground: '#f7f7ff',
       shellShadow: '0 20px 54px rgba(76, 29, 149, 0.12)',
+    },
+    instant: {
+      accent: '#db2777',
+      accentSoft: '#fdf2f8',
+      accentBorder: '#fbcfe8',
+      headerGradient: 'linear-gradient(135deg, #db2777 0%, #be185d 100%)',
+      pageBackground: '#fffcfd',
+      shellShadow: '0 20px 54px rgba(219, 39, 119, 0.16)',
     },
   };
   const visual = presetVisuals[visualPreset] || presetVisuals.classic;

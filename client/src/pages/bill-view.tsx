@@ -377,7 +377,8 @@ export default function BillView() {
                 qrCode: qrCodeUrl || undefined,
                 isExpressOrder: isExpressFromOrder,
                 isUpdate: isEditedBill,
-                preset: isEditedBill ? 'edited' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const),
+                orderType: order.orderType || (order as any).order_type,
+                preset: isEditedBill ? 'edited' as const : (order?.orderType === 'instant' || (order as any)?.order_type === 'instant' ? 'instant' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const)),
                 fulfillmentType: order.fulfillmentType || 'pickup',
                 deliveryAddress: order.deliveryAddress || formattedAddress,
                 paymentBreakdown: {
@@ -426,7 +427,8 @@ export default function BillView() {
                 qrCode: qrCodeUrl || undefined,
                 isExpressOrder: isExpressFromOrder,
                 isUpdate: isEditedBill,
-                preset: isEditedBill ? 'edited' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const),
+                orderType: order.orderType || (order as any).order_type,
+                preset: isEditedBill ? 'edited' as const : (order?.orderType === 'instant' || (order as any)?.order_type === 'instant' ? 'instant' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const)),
                 fulfillmentType: order.fulfillmentType || 'pickup',
                 deliveryAddress: order.deliveryAddress || formattedAddress,
                 paymentBreakdown: {
