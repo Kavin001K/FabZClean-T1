@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import InvoiceTemplateIN from '@/components/print/invoice-template-in';
 import SimpleInvoiceTemplate from '@/components/print/simple-invoice-template';
 import { formatCurrency, formatDate } from "@/lib/data-service";
+import { getOrderPriorityInfo } from '@/lib/order-priority';
 // @ts-ignore
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
@@ -154,12 +155,15 @@ export default function BillView() {
 
     // Determine the invoice preset
     // Priority: 1. Query Param, 2. Auto-detect from order flags, 3. Default 'classic'
-    const isExpressFromOrder = !!(order as any)?.isExpressOrder || !!(order as any)?.is_express_order;
+    const priorityInfo = getOrderPriorityInfo(order as any);
+    const isExpressFromOrder = priorityInfo.isPriority;
     const resolvedPreset: 'classic' | 'express' | 'edited' = presetParam
       ? presetParam
-      : isExpressFromOrder
-        ? 'express'
-        : 'classic';
+      : priorityInfo.isInstant
+        ? 'instant'
+        : isExpressFromOrder
+          ? 'express'
+          : 'classic';
     // Detect if this is an edited bill (preset param explicitly set, or both express + edited)
     const isEditedBill = presetParam === 'edited';
 
@@ -378,7 +382,7 @@ export default function BillView() {
                 isExpressOrder: isExpressFromOrder,
                 isUpdate: isEditedBill,
                 orderType: order.orderType || (order as any).order_type,
-                preset: isEditedBill ? 'edited' as const : (order?.orderType === 'instant' || (order as any)?.order_type === 'instant' ? 'instant' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const)),
+                preset: isEditedBill ? 'edited' as const : (priorityInfo.isInstant ? 'instant' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const)),
                 fulfillmentType: order.fulfillmentType || 'pickup',
                 deliveryAddress: order.deliveryAddress || formattedAddress,
                 paymentBreakdown: {
@@ -428,7 +432,7 @@ export default function BillView() {
                 isExpressOrder: isExpressFromOrder,
                 isUpdate: isEditedBill,
                 orderType: order.orderType || (order as any).order_type,
-                preset: isEditedBill ? 'edited' as const : (order?.orderType === 'instant' || (order as any)?.order_type === 'instant' ? 'instant' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const)),
+                preset: isEditedBill ? 'edited' as const : (priorityInfo.isInstant ? 'instant' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const)),
                 fulfillmentType: order.fulfillmentType || 'pickup',
                 deliveryAddress: order.deliveryAddress || formattedAddress,
                 paymentBreakdown: {

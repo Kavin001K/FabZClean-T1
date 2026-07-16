@@ -23,6 +23,8 @@ import { GarmentTagPrint } from './garment-tag-print';
 import { generateUPIUrl, PAYMENT_CONFIG } from '@/lib/franchise-config';
 import { resolveOrderStoreCodeFromOrder } from '@/lib/order-store';
 import { smartItemSummary } from '@/lib/item-summarizer';
+import { getOrderPriorityInfo } from '@/lib/order-priority';
+import { cn } from '@/lib/utils';
 
 interface OrderConfirmationDialogProps {
     open: boolean;
@@ -458,6 +460,7 @@ export function OrderConfirmationDialog({
     }, [open, order?.id]);
 
     if (!order) return null;
+    const priorityInfo = getOrderPriorityInfo(order as any);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -477,12 +480,12 @@ export function OrderConfirmationDialog({
                         <DialogDescription className="text-sm text-gray-500">
                             Order <span className="font-mono font-bold text-emerald-600">#{order.orderNumber}</span> has been created.
                         </DialogDescription>
-                        {/* Express Order Badge */}
-                        {((order as any)?.isExpressOrder || (order as any)?.is_express_order) && (
+                        {/* Priority Order Badge */}
+                        {priorityInfo.isPriority && (
                             <div className="flex justify-center pt-2">
-                                <Badge className="bg-orange-500 text-white animate-pulse gap-1">
+                                <Badge className={cn(priorityInfo.badgeClassName, "animate-pulse gap-1")}>
                                     <Zap className="h-3 w-3" />
-                                    EXPRESS ORDER - PRIORITY
+                                    {priorityInfo.label.toUpperCase()}
                                 </Badge>
                             </div>
                         )}
@@ -629,7 +632,7 @@ export function OrderConfirmationDialog({
                 franchiseId={(order as any)?.franchiseId || (order as any)?.franchise_id || null}
                 storeCode={resolveOrderStoreCodeFromOrder(order)}
                 commonNote={(order as any)?.specialInstructions || (order as any)?.special_instructions || undefined}
-                isExpressOrder={(order as any)?.isExpressOrder || (order as any)?.is_express_order || false}
+                isExpressOrder={priorityInfo.isPriority}
                 billDate={order?.createdAt ? String(order.createdAt) : undefined}
                 dueDate={order?.pickupDate ? String(order.pickupDate) : (order as any)?.dueDate ? String((order as any).dueDate) : undefined}
                 items={(order?.items || []).map((item: any) => ({

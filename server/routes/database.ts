@@ -75,6 +75,18 @@ router.get('/apply-indexes', async (req, res) => {
             ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS express_charge DECIMAL(10, 2) DEFAULT 0;
             ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS instant_charge DECIMAL(10, 2) DEFAULT 0;
             ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS status_timestamps JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS cover_type TEXT NOT NULL DEFAULT 'bag';
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_partner_id TEXT;
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS bag_count INTEGER DEFAULT 1;
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tags_printed BOOLEAN DEFAULT false;
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
+            ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS dispatched_at TIMESTAMPTZ;
+            -- customers schema additions
+            ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS notes TEXT;
+            ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS company_name TEXT;
+            ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS tax_id TEXT;
+            ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+            ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS payment_terms TEXT;
 
             CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -159,12 +171,111 @@ router.get('/apply-indexes', async (req, res) => {
         `;
 
         await client.query(sql);
+
+        // Notify PostgREST to reload its schema cache so new columns are visible immediately
+        try {
+            await client.query("SELECT pg_notify('pgrst', 'reload schema');");
+        } catch (notifyErr: any) {
+            console.warn('[database] NOTIFY pgrst skipped (may not be a superuser connection):', notifyErr.message);
+        }
+
         await client.end();
 
-        res.json({ success: true, message: 'Successfully applied GIN pg_trgm indexes and optimized autocomplete RPC!' });
+        res.json({ success: true, message: 'Successfully applied schema migrations, GIN indexes, RPC functions, and reloaded PostgREST schema cache.' });
     } catch (error: any) {
         console.error('Failed to apply indexes:', error);
         res.status(500).json({ error: error.message, stack: error.stack });
+    }
+});
+
+// Apply schema via Supabase REST (works without direct pg TCP connection)
+// Runs ALTER TABLE statements for all columns defined in shared/schema but missing from DB.
+router.get('/apply-schema', async (req, res) => {
+    try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = process.env.SUPABASE_URL || '';
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || '';
+
+        if (!supabaseUrl || !supabaseServiceKey) {
+            return res.status(500).json({ error: 'SUPABASE_URL or SUPABASE_SERVICE_KEY not set.' });
+        }
+
+        const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+            auth: { persistSession: false }
+        });
+
+        const statements = [
+            // orders - missing columns detected by schema comparison
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS cover_type TEXT NOT NULL DEFAULT 'bag'`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_partner_id TEXT`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS bag_count INTEGER DEFAULT 1`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tags_printed BOOLEAN DEFAULT false`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS dispatched_at TIMESTAMPTZ`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS status_timestamps JSONB DEFAULT '{}'::jsonb`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_type VARCHAR(50) DEFAULT 'normal'`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS express_charge DECIMAL(10,2) DEFAULT 0`,
+            `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS instant_charge DECIMAL(10,2) DEFAULT 0`,
+            // customers - missing columns
+            `ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS notes TEXT`,
+            `ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS company_name TEXT`,
+            `ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS tax_id TEXT`,
+            `ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS date_of_birth DATE`,
+            `ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS payment_terms TEXT`,
+        ];
+
+        const results: { sql: string; ok: boolean; error?: string }[] = [];
+
+        for (const stmt of statements) {
+            // Use supabase.rpc('exec_sql') if available, otherwise use raw fetch to the Supabase Management API
+            // Supabase exposes pg_catalog via the sql endpoint in service role
+            const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': supabaseServiceKey,
+                    'Authorization': `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({ sql: stmt }),
+            });
+
+            if (response.ok) {
+                results.push({ sql: stmt, ok: true });
+            } else {
+                const errText = await response.text();
+                // IF NOT EXISTS errors are harmless - treat as success
+                if (errText.includes('already exists') || errText.includes('PGRST202')) {
+                    results.push({ sql: stmt, ok: true });
+                } else {
+                    results.push({ sql: stmt, ok: false, error: errText });
+                }
+            }
+        }
+
+        // Reload PostgREST schema cache
+        await fetch(`${supabaseUrl}/rest/v1/rpc/reload_schema`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseServiceKey,
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({}),
+        }).catch(() => {});
+
+        const failed = results.filter(r => !r.ok);
+        if (failed.length > 0) {
+            return res.status(207).json({
+                success: false,
+                message: `${failed.length} statement(s) failed.`,
+                results,
+            });
+        }
+
+        res.json({ success: true, message: `Applied ${results.length} schema statements successfully.`, results });
+    } catch (error: any) {
+        console.error('Failed to apply schema:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 

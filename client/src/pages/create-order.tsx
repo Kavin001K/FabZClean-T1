@@ -34,6 +34,7 @@ import {
   getOrderStoreLabel,
   resolveOrderStoreCodeFromEmployee,
 } from "@/lib/order-store";
+import { getOrderPriorityInfo } from "@/lib/order-priority";
 import { formatCurrencyWithSettings, roundInvoiceAmount } from "@/lib/settings-utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -889,6 +890,14 @@ export default function CreateOrder() {
           newOrder.storeCode = newOrder.store_code || storeCode;
         }
 
+        // 4c. Ensure bag/cover metadata survives DB schema drift on the create response
+        if (newOrder.bagCount === undefined && newOrder.bag_count === undefined) {
+          newOrder.bagCount = bagCount;
+        }
+        if (!newOrder.coverType && !newOrder.cover_type) {
+          newOrder.coverType = coverType;
+        }
+
         // 5. Ensure Customer Name
         if (!newOrder.customerName) {
           newOrder.customerName = newOrder.customer_name || customerName;
@@ -902,6 +911,12 @@ export default function CreateOrder() {
         // 7. Ensure Express Order flag
         if (newOrder.isExpressOrder === undefined) {
           newOrder.isExpressOrder = newOrder.is_express_order || isExpressOrder;
+        }
+        if (!newOrder.orderType && !newOrder.order_type) {
+          newOrder.orderType = orderType;
+        }
+        if (!newOrder.priority) {
+          newOrder.priority = orderType === 'instant' ? 'urgent' : orderType === 'express' ? 'high' : 'normal';
         }
 
         // 8. Ensure items have tagNote for garment tags
@@ -943,33 +958,34 @@ export default function CreateOrder() {
         queryClient.invalidateQueries({ queryKey: ["customers"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
 
-        // Add notification - highlight express orders
-        const isExpress = (newOrder as any).isExpressOrder;
+        // Add notification - highlight priority orders
+        const priorityInfo = getOrderPriorityInfo(newOrder);
+        const isPriorityOrder = priorityInfo.isPriority;
         addNotification({
-          type: isExpress ? 'warning' : 'success',
-          title: isExpress ? '⚡ EXPRESS Order Created!' : 'Order Created Successfully!',
-          message: isExpress
-            ? `PRIORITY: Order ${newOrder.orderNumber} for ${newOrder.customerName} - 3 day turnaround`
+          type: isPriorityOrder ? 'warning' : 'success',
+          title: isPriorityOrder ? `⚡ ${priorityInfo.shortLabel} Order Created!` : 'Order Created Successfully!',
+          message: isPriorityOrder
+            ? `PRIORITY: Order ${newOrder.orderNumber} for ${newOrder.customerName} - fast-track handling required`
             : `Order ${newOrder.orderNumber} has been created for ${newOrder.customerName}`,
           actionUrl: '/orders',
           actionText: 'View Orders'
         });
 
-        // If express order, add additional priority notification
-        if (isExpress) {
+        // If priority order, add additional priority notification
+        if (isPriorityOrder) {
           addNotification({
             type: 'warning',
             title: '🔥 Fast Track Required',
-            message: `Express order ${newOrder.orderNumber} needs priority transit processing`,
+            message: `${priorityInfo.label} ${newOrder.orderNumber} needs priority transit processing`,
             actionUrl: '/transit-orders',
             actionText: 'Go to Transit'
           });
         }
 
         toast({
-          title: isExpress ? "⚡ Express Order Created!" : "Order Created Successfully!",
-          description: isExpress
-            ? `Priority order ${newOrder.orderNumber} - 50% surcharge applied, 3-day turnaround`
+          title: isPriorityOrder ? `⚡ ${priorityInfo.shortLabel} Order Created!` : "Order Created Successfully!",
+          description: isPriorityOrder
+            ? `${priorityInfo.label} ${newOrder.orderNumber} has been created for fast-track handling.`
             : `Order ${newOrder.orderNumber} has been created and saved.`,
         });
 

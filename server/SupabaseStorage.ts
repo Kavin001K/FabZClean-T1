@@ -25,6 +25,7 @@ export class SupabaseStorage {
     private supabase: SupabaseClient;
     private static readonly MAX_CUSTOMER_WRITE_RETRIES = 8;
     private static readonly MAX_ORDER_WRITE_RETRIES = 8;
+    private readonly unavailableOrderColumns = new Set<string>();
 
     constructor() {
         const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -116,14 +117,42 @@ export class SupabaseStorage {
         payload: Record<string, any>,
         id?: string
     ): Promise<any> {
-        const result = operation === 'insert'
-            ? await this.supabase.from('orders').insert(payload).select('*').single()
-            : await this.supabase.from('orders').update(payload).eq('id', id).select('*').single();
-            
-        const { data, error } = result;
+        const workingPayload = { ...payload };
+
+        for (const column of this.unavailableOrderColumns) {
+            delete workingPayload[column];
+        }
+
+        let data: any = null;
+        let error: any = null;
+
+        for (let attempt = 0; attempt < SupabaseStorage.MAX_ORDER_WRITE_RETRIES; attempt++) {
+            const result = operation === 'insert'
+                ? await this.supabase.from('orders').insert(workingPayload).select('*').single()
+                : await this.supabase.from('orders').update(workingPayload).eq('id', id).select('*').single();
+
+            data = result.data;
+            error = result.error;
+
+            if (!error) break;
+
+            const missingColumn = this.getMissingOrdersColumn(error);
+            if (missingColumn && Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)) {
+                console.warn(
+                    `[SupabaseStorage] orders ${operation} retrying without unavailable column "${missingColumn}". ` +
+                    `Apply the matching database migration to persist this field.`
+                );
+                this.unavailableOrderColumns.add(missingColumn);
+                delete workingPayload[missingColumn];
+                continue;
+            }
+
+            console.error(`[SupabaseStorage] orders ${operation} failed:`, error.message, error.details);
+            throw error;
+        }
 
         if (error) {
-            console.error(`[SupabaseStorage] orders ${operation} failed:`, error.message, error.details);
+            console.error(`[SupabaseStorage] orders ${operation} failed after retries:`, error.message, error.details);
             throw error;
         }
 
@@ -133,6 +162,12 @@ export class SupabaseStorage {
         }
 
         return data;
+    }
+
+    private getMissingOrdersColumn(error: any): string | null {
+        const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+        const match = /Could not find the '([^']+)' column of 'orders' in the schema cache/i.exec(message);
+        return match?.[1] || null;
     }
 
     private shouldFallbackCancelOrderRpc(error: any): boolean {

@@ -8,6 +8,7 @@ import { Eye, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
+import { getOrderPriorityInfo } from "@/lib/order-priority";
 
 export interface Order {
   id: string;
@@ -23,6 +24,9 @@ export interface Order {
   createdAt: string;
   isExpressOrder?: boolean;
   is_express_order?: boolean;
+  orderType?: string;
+  order_type?: string;
+  priority?: string;
 }
 
 interface RecentOrdersProps {
@@ -126,25 +130,26 @@ export default React.memo(function RecentOrders({
       <CardContent>
         <div className="space-y-3">
           {displayOrders.map((order, index) => {
-            const isExpress = order.isExpressOrder || order.is_express_order || (order as any).priority === 'high';
+            const priorityInfo = getOrderPriorityInfo(order as any);
+            const isPriority = priorityInfo.isPriority;
             return (
               <div
                 key={order.id || index}
-                className={`relative flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors overflow-hidden ${isExpress ? 'border-orange-400 bg-orange-50/50 dark:bg-orange-950/20' : ''
+                className={`relative flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors overflow-hidden ${isPriority ? priorityInfo.rowClassName : ''
                   }`}
               >
-                {/* EXPRESS Stamp Watermark */}
-                {isExpress && (
+                {/* Priority Stamp Watermark */}
+                {isPriority && (
                   <div className="absolute top-1/2 right-8 transform -translate-y-1/2 rotate-[-15deg] pointer-events-none z-0">
                     <span className="text-orange-500/15 text-3xl font-black tracking-widest">
-                      EXPRESS
+                      {priorityInfo.shortLabel}
                     </span>
                   </div>
                 )}
 
                 <div className="flex items-center space-x-4 relative z-10">
-                  <Avatar className={`h-10 w-10 ${isExpress ? 'ring-2 ring-orange-400' : ''}`}>
-                    <AvatarFallback className={`text-xs ${isExpress ? 'bg-orange-100 text-orange-700' : ''}`}>
+                  <Avatar className={`h-10 w-10 ${isPriority ? 'ring-2 ring-orange-400' : ''}`}>
+                    <AvatarFallback className={`text-xs ${isPriority ? 'bg-orange-100 text-orange-700' : ''}`}>
                       {order.customerName ?
                         order.customerName.split(' ').map(n => n[0]).join('').toUpperCase() :
                         'N/A'

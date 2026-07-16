@@ -27,6 +27,7 @@ import Skeleton from '@/components/ui/loading-skeleton';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { getOrderPriorityInfo } from '@/lib/order-priority';
 
 interface DashboardRecentOrdersProps {
   /** Recent orders data */
@@ -179,7 +180,7 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
 
                 <div className="flex items-center justify-between border-t border-border/40 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                   <span>Recent activity</span>
-                  <span>{order.isExpressOrder ? 'Express' : 'Standard'}</span>
+                  <span>{getOrderPriorityInfo(order).isPriority ? getOrderPriorityInfo(order).shortLabel : 'Standard'}</span>
                 </div>
               </div>
             ))}

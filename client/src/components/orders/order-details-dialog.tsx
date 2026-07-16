@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { useInvoicePrint } from "@/hooks/use-invoice-print";
 import { getOrderStoreLabel, resolveOrderStoreCodeFromOrder } from "@/lib/order-store";
 import { MAX_WHATSAPP_SENDS } from "@/lib/whatsapp-service";
+import { getOrderPriorityInfo } from "@/lib/order-priority";
 
 export interface OrderDetailsDialogProps {
   order: Order | null;
@@ -105,15 +106,6 @@ const getStatusColor = (status: Order['status']) => {
   }
 };
 
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case 'High': return 'bg-red-100 text-red-800 border-red-200';
-    case 'Normal': return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'Low': return 'bg-gray-100 text-gray-800 border-gray-200';
-    default: return 'bg-blue-100 text-blue-800 border-blue-200';
-  }
-};
-
 const isTerminalOrderStatus = (status: Order['status']) =>
   status === 'cancelled' || status === 'completed' || status === 'delivered';
 
@@ -156,6 +148,7 @@ export default React.memo(function OrderDetailsDialog({
   if (!order) return null;
 
   const anyOrder = order as any; // Helper casting for dynamic fields
+  const priorityInfo = getOrderPriorityInfo(anyOrder);
   const nextStatus = getNextStatus(order.status, anyOrder.fulfillmentType);
   const parseMoney = (value: unknown): number => {
     const parsed = Number(value);
@@ -360,8 +353,8 @@ export default React.memo(function OrderDetailsDialog({
 
               <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority</span>
-                <Badge className={cn("font-black tracking-widest uppercase text-[10px] px-3 py-1", getPriorityColor(anyOrder.priority || 'Normal'))}>
-                  {anyOrder.priority || 'Normal'}
+                <Badge className={cn("font-black tracking-widest uppercase text-[10px] px-3 py-1", priorityInfo.badgeClassName)}>
+                  {priorityInfo.shortLabel}
                 </Badge>
               </div>
             </div>

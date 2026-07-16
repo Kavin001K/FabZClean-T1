@@ -99,6 +99,7 @@ import { MAX_WHATSAPP_SENDS, WhatsAppService } from '@/lib/whatsapp-service';
 import { printDriver, convertOrderToInvoiceData } from '@/lib/print-driver'; // Added imports
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { getOrderPriorityInfo } from "@/lib/order-priority";
 import { isElectron, isMac } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -1876,9 +1877,14 @@ function OrdersComponent() {
         </div>
         <div className="min-w-0 truncate font-mono font-medium flex items-center gap-2">
           {order.orderNumber}
-          {((order as any).isExpressOrder) && (
-            <Badge className="bg-orange-500 text-white text-[9px] px-1.5 py-0 h-5">EXPRESS</Badge>
-          )}
+          {(() => {
+            const priorityInfo = getOrderPriorityInfo(order as any);
+            return priorityInfo.isPriority ? (
+              <Badge className={cn(priorityInfo.badgeClassName, "text-[9px] px-1.5 py-0 h-5")}>
+                {priorityInfo.shortLabel}
+              </Badge>
+            ) : null;
+          })()}
         </div>
         <div className="truncate flex flex-col">
           <span className="font-medium">{order.customerName}</span>

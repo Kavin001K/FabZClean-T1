@@ -42,6 +42,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { getOrderPriorityInfo } from "@/lib/order-priority";
 
 export interface OrdersTableProps {
   orders: Order[];
@@ -110,15 +111,6 @@ const getStatusColor = (status: Order['status']) => {
     case 'out_for_delivery': return 'bg-orange-100 text-orange-800 border-orange-200';
     case 'in_store': return 'bg-teal-100 text-teal-800 border-teal-200';
     default: return 'bg-gray-100 text-gray-800 border-gray-200';
-  }
-};
-
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case 'High': return 'bg-red-100 text-red-800 border-red-200';
-    case 'Normal': return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'Low': return 'bg-gray-100 text-gray-800 border-gray-200';
-    default: return 'bg-blue-100 text-blue-800 border-blue-200';
   }
 };
 
@@ -359,9 +351,14 @@ export default React.memo(function OrdersTable({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge className={getPriorityColor((order as any).priority || 'Normal')}>
-                    {(order as any).priority || 'Normal'}
-                  </Badge>
+                  {(() => {
+                    const priorityInfo = getOrderPriorityInfo(order as any);
+                    return (
+                      <Badge className={priorityInfo.badgeClassName}>
+                        {priorityInfo.shortLabel}
+                      </Badge>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">

@@ -5,6 +5,7 @@ import React from 'react';
 import * as QRCode from 'qrcode';
 import InvoiceTemplateIN from '../components/print/invoice-template-in';
 import { isElectron } from './utils';
+import { getOrderPriorityInfo } from './order-priority';
 import {
   type InvoiceTemplatePresetKey,
   type InvoiceTemplateConfig,
@@ -494,8 +495,12 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
 
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const tax = enableGST ? items.reduce((sum, item) => sum + (item.total * (item.taxRate || 0) / 100), 0) : 0;
-  const isExpress = order.isExpressOrder || order.is_express_order || false;
-  const expressSurcharge = isExpress ? subtotal * 0.5 : 0;
+  const priorityInfo = getOrderPriorityInfo(order as any);
+  const expressSurcharge = priorityInfo.isInstant
+    ? subtotal
+    : priorityInfo.isExpress
+      ? subtotal * 0.5
+      : 0;
   const total = subtotal + tax + expressSurcharge;
 
   // Generate invoice number with franchise prefix
@@ -562,7 +567,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
       ? 'GST Invoice. Tax is calculated at applicable rates. Payment due within 30 days.'
       : 'Payment due within 30 days of invoice date.',
     status: order.status,
-    isExpressOrder: isExpress,
+    isExpressOrder: priorityInfo.isPriority,
     isUpdate,
     paymentBreakdown,
   };
