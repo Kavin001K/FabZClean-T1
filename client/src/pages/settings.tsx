@@ -51,7 +51,7 @@ import InvoiceTemplateIN from '@/components/print/invoice-template-in';
 const SAMPLE_INVOICE_DATA = {
   invoiceNumber: 'INV-2026-0001',
   invoiceDate: new Date().toISOString().split('T')[0],
-  dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  dueDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
   company: {
     name: 'FabZClean Main',
     address: '123 Laundry Lane, Pollachi',
@@ -1036,7 +1036,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Default Due Days</Label>
-                    <Input type="number" value={profileDraft.invoiceDefaults.defaultDueDays || 2} onChange={(e) => setProfileDraft({ ...profileDraft, invoiceDefaults: { ...profileDraft.invoiceDefaults, defaultDueDays: Number(e.target.value) || 0 } })} />
+                    <Input type="number" value={profileDraft.invoiceDefaults.defaultDueDays || 12} onChange={(e) => setProfileDraft({ ...profileDraft, invoiceDefaults: { ...profileDraft.invoiceDefaults, defaultDueDays: Number(e.target.value) || 0 } })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Pickup Wording</Label>

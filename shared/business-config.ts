@@ -78,7 +78,7 @@ export const tagTemplateConfigSchema = z.object({
 export type TagTemplateConfig = z.infer<typeof tagTemplateConfigSchema>;
 
 export const invoiceDefaultsSchema = z.object({
-  defaultDueDays: z.number().int().min(0).max(365).default(2),
+  defaultDueDays: z.number().int().min(0).max(365).default(12),
   defaultPickupWording: z.string().optional().default("Pickup"),
   defaultPrintCopies: z.number().int().min(1).max(10).default(1),
   useTemplateBasedInvoices: z.boolean().default(false),

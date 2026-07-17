@@ -80,7 +80,7 @@ const safeParseFloat = (val: any) => {
 };
 
 const toDateOnly = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
-const DEFAULT_DUE_DATE_OFFSET_DAYS = 8;
+const DEFAULT_DUE_DATE_OFFSET_DAYS = 12;
 const EXPRESS_DUE_DATE_OFFSET_DAYS = 4;
 const INSTANT_DUE_DATE_OFFSET_DAYS = 2;
 
@@ -795,7 +795,7 @@ export default function CreateOrder() {
     }
   }, [lastAddedInstanceKey, selectedServices]);
 
-  // Auto-set due date: 8 days (regular), 4 days (express), or 2 days (instant) from the selected order creation date
+  // Auto-set due date: 12 days (regular), 4 days (express), or 2 days (instant) from the selected order creation date
   useEffect(() => {
     const offsetDays = 
       orderType === 'instant' ? INSTANT_DUE_DATE_OFFSET_DAYS :
