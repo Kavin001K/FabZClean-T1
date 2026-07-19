@@ -134,7 +134,7 @@ export default function CreateOrder() {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [orderType, setOrderType] = useState<'normal' | 'express' | 'instant'>('normal');
   const isExpressOrder = orderType === 'express' || orderType === 'instant';
-  const [bagCount, setBagCount] = useState(1);
+  const [bagCount, setBagCount] = useState<number | ''>(1);
   const [coverType, setCoverType] = useState<OrderCoverType>('bag');
 
   // Abandoned Cart Recovery
@@ -892,7 +892,7 @@ export default function CreateOrder() {
 
         // 4c. Ensure bag/cover metadata survives DB schema drift on the create response
         if (newOrder.bagCount === undefined && newOrder.bag_count === undefined) {
-          newOrder.bagCount = bagCount;
+          newOrder.bagCount = bagCount || 1;
         }
         if (!newOrder.coverType && !newOrder.cover_type) {
           newOrder.coverType = coverType;
@@ -1251,7 +1251,7 @@ export default function CreateOrder() {
       // Wallet usage
       useWallet: useWallet,
       // Bag count
-      bagCount: bagCount,
+      bagCount: bagCount || 1,
       coverType,
     };
 

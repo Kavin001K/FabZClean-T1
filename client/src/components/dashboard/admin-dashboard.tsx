@@ -1019,8 +1019,8 @@ export default function AdminDashboard() {
                                         </TableHeader>
                                         <TableBody>
                                             {filteredOrders
-                                                .filter(o => o.status !== 'cancelled' && o.status !== 'refunded')
-                                                .sort((a, b) => parseFloat(b.totalAmount || 0) - parseFloat(a.totalAmount || 0))
+                                                .filter(o => !['cancelled', 'refunded'].includes(o.status))
+                                                .sort((a, b) => parseFloat(String(b.totalAmount ?? 0)) - parseFloat(String(a.totalAmount ?? 0)))
                                                 .slice(0, 20)
                                                 .map((o: any) => (
                                                     <TableRow key={o.id}>

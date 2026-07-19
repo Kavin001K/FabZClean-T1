@@ -132,6 +132,7 @@ export default React.memo(function RecentOrders({
           {displayOrders.map((order, index) => {
             const priorityInfo = getOrderPriorityInfo(order as any);
             const isPriority = priorityInfo.isPriority;
+            const isExpress = priorityInfo.isExpress;
             return (
               <div
                 key={order.id || index}

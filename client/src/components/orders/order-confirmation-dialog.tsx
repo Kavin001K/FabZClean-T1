@@ -14,7 +14,8 @@ import JsBarcode from 'jsbarcode';
 // @ts-ignore
 import QRCode from 'qrcode';
 import { Order } from '@shared/schema';
-import { formatCurrency, customersApi } from '@/lib/data-service';
+import { formatCurrency, customersApi, authorizedFetch } from '@/lib/data-service';
+import { queryClient } from '@/lib/queryClient';
 import { WhatsAppService, MAX_WHATSAPP_SENDS } from '@/lib/whatsapp-service';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
